@@ -22,9 +22,12 @@ void main() {
     // Panel edges: thin bright lines across and along the tunnel.
     float eu = abs(fract(lu) - 0.5);
     float ez = abs(fract(lz) - 0.5);
-    float lineU = smoothstep(0.43, 0.5, eu);
-    float lineZ = smoothstep(0.40, 0.5, ez);
-    float line = max(lineU, lineZ) * (1.0 - fog);
+    // Thin lines; they fade out with distance before they start to alias.
+    float lineU = smoothstep(0.455, 0.49, eu);
+    float lineZ = smoothstep(0.47, 0.495, ez);
+    // Right under the camera a line covers half the screen: dim it there.
+    float nearDim = 0.25 + 0.75 * smoothstep(0.5, 4.0, dist);
+    float line = max(lineU, lineZ) * (1.0 - fog) * (1.0 - fog) * nearDim;
 
     // Slow colour cycle along the tunnel, light checkerboard for depth cues.
     float band = floor(lz);

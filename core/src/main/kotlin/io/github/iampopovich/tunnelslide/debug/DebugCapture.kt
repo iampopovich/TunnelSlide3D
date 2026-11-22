@@ -30,9 +30,9 @@ class DebugCapture private constructor(private val path: String, private val fra
     }
 
     companion object {
-        fun fromEnv(): DebugCapture? {
-            val path = System.getenv("TS_SCREENSHOT") ?: return null
-            val frame = System.getenv("TS_SCREENSHOT_FRAME")?.toIntOrNull() ?: 90
+        fun from(options: DebugOptions): DebugCapture? {
+            val path = options["TS_SCREENSHOT"] ?: return null
+            val frame = options["TS_SCREENSHOT_FRAME"]?.toIntOrNull() ?: 90
             return DebugCapture(path, frame)
         }
     }

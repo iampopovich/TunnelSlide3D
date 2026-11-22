@@ -24,12 +24,16 @@ class ObstacleField(seed: Long) {
     val history = ArrayList<Pattern>()
 
     val obstacles: Collection<Obstacle> get() = items
+    /** Bumped whenever blocks are added, so renderers know when to rebuild their buffers. */
+    var version = 0
+        private set
 
     init { reset(seed) }
 
     fun reset(seed: Long) {
         rng.setSeed(seed)
         items.clear(); history.clear(); path.clear()
+        version++
         zones.reset(seed xor 0x5EEDL)
         // Straight run-up from the start; the first route point can be anywhere,
         // there is enough distance to reach it.
@@ -88,6 +92,7 @@ class ObstacleField(seed: Long) {
         b.blocks.filter { isClearOfRoute(it, margin) }
             .sortedBy { it.z }
             .forEach { insertSorted(it) }
+        version++
     }
 
     private fun pick(d: Float): Pattern {

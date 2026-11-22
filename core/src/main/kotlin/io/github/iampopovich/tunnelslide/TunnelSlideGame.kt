@@ -9,10 +9,12 @@ import com.badlogic.gdx.graphics.PerspectiveCamera
 import com.badlogic.gdx.math.MathUtils
 import com.badlogic.gdx.utils.TimeUtils
 import io.github.iampopovich.tunnelslide.debug.DebugCapture
+import io.github.iampopovich.tunnelslide.debug.DebugOptions
 import io.github.iampopovich.tunnelslide.input.SteeringInput
 import io.github.iampopovich.tunnelslide.render.BlockRenderer
 import io.github.iampopovich.tunnelslide.render.Hud
 import io.github.iampopovich.tunnelslide.render.Palette
+import io.github.iampopovich.tunnelslide.render.SurfaceUniforms
 import io.github.iampopovich.tunnelslide.render.TunnelRenderer
 import io.github.iampopovich.tunnelslide.world.Autopilot
 import io.github.iampopovich.tunnelslide.world.ObstacleField
@@ -20,8 +22,8 @@ import io.github.iampopovich.tunnelslide.world.RunState
 import io.github.iampopovich.tunnelslide.world.ZoneKind
 
 /** Entry point shared by all platforms. */
-class TunnelSlideGame : ApplicationAdapter() {
-    private val capture = DebugCapture.fromEnv()
+class TunnelSlideGame(private val debug: DebugOptions = DebugOptions.NONE) : ApplicationAdapter() {
+    private val capture = DebugCapture.from(debug)
 
     private lateinit var camera: PerspectiveCamera
     private lateinit var tunnel: TunnelRenderer
@@ -30,6 +32,7 @@ class TunnelSlideGame : ApplicationAdapter() {
     private lateinit var steering: SteeringInput
     private lateinit var prefs: Preferences
     private val run = RunState()
+    private val surface = SurfaceUniforms()
     private val field = ObstacleField(seed = 1L)
     private var accumulator = 0f
     private var crashAge = -1f
@@ -46,11 +49,11 @@ class TunnelSlideGame : ApplicationAdapter() {
         steering = SteeringInput()
         prefs = Gdx.app.getPreferences("tunnelslide3d")
         best = prefs.getInteger(PREF_BEST, 0)
-        if (System.getenv("TS_AUTOPILOT") != null) {
+        if (debug.has("TS_AUTOPILOT")) {
             steering.autopilot = { _ -> Autopilot.steer(run, field) }
         }
-        field.difficultyOverride = System.getenv("TS_DIFFICULTY")?.toFloatOrNull()
-        field.zones.forcedFirst = System.getenv("TS_ZONE")?.let { name ->
+        field.difficultyOverride = debug["TS_DIFFICULTY"]?.toFloatOrNull()
+        field.zones.forcedFirst = debug["TS_ZONE"]?.let { name ->
             ZoneKind.entries.firstOrNull { it.name.equals(name, ignoreCase = true) }
         }
         newRun()
@@ -58,7 +61,7 @@ class TunnelSlideGame : ApplicationAdapter() {
 
     private fun newRun() {
         run.reset()
-        field.reset(System.getenv("TS_SEED")?.toLongOrNull() ?: TimeUtils.millis())
+        field.reset(debug["TS_SEED"]?.toLongOrNull() ?: TimeUtils.millis())
         field.update(run.playerZ, run.speed)
         accumulator = 0f
         crashAge = -1f
@@ -79,6 +82,7 @@ class TunnelSlideGame : ApplicationAdapter() {
         } else {
             accumulator += frame
             val steer = steering.read(frame, run.time)
+            logSensors(frame, steer)
             while (accumulator >= GameConfig.FIXED_STEP && !run.crashed) {
                 run.step(GameConfig.FIXED_STEP, steer, field)
                 accumulator -= GameConfig.FIXED_STEP
@@ -89,10 +93,24 @@ class TunnelSlideGame : ApplicationAdapter() {
         updateCamera()
         Gdx.gl.glClearColor(Palette.FOG.r, Palette.FOG.g, Palette.FOG.b, 1f)
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT or GL20.GL_DEPTH_BUFFER_BIT)
-        tunnel.render(camera, run, field.zones)
-        blocks.render(camera, run, field.obstacles, field.zones)
+        surface.update(run, field.zones)
+        tunnel.render(camera, run, surface)
+        blocks.render(camera, run, field, surface)
         hud.render(run, best, crashAge)
         capture?.onFrameRendered()
+    }
+
+    private var sensorLogTimer = 0f
+
+    /** TS_SENSORLOG: logs rotation, accelerometer and steering once a second. */
+    private fun logSensors(frame: Float, steer: Float) {
+        if (!debug.has("TS_SENSORLOG")) return
+        sensorLogTimer += frame
+        if (sensorLogTimer < 1f) return
+        sensorLogTimer = 0f
+        Gdx.app.log(TAG, "sensors rot=${Gdx.input.rotation} ax=%.2f ay=%.2f az=%.2f right=%.2f steer=%.2f fps=%d".format(
+            Gdx.input.accelerometerX, Gdx.input.accelerometerY, Gdx.input.accelerometerZ,
+            steering.screenRightAccel(), steer, Gdx.graphics.framesPerSecond))
     }
 
     private fun onCrash() {
