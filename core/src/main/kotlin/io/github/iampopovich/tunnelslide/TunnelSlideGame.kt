@@ -16,9 +16,15 @@ import io.github.iampopovich.tunnelslide.input.SteeringInput
 import io.github.iampopovich.tunnelslide.render.BlockRenderer
 import io.github.iampopovich.tunnelslide.render.Effects
 import io.github.iampopovich.tunnelslide.render.Hud
+import io.github.iampopovich.tunnelslide.render.MenuRenderer
 import io.github.iampopovich.tunnelslide.render.Palette
 import io.github.iampopovich.tunnelslide.render.SurfaceUniforms
 import io.github.iampopovich.tunnelslide.render.TunnelRenderer
+import io.github.iampopovich.tunnelslide.ui.Level
+import io.github.iampopovich.tunnelslide.ui.MenuAction
+import io.github.iampopovich.tunnelslide.ui.MenuModel
+import io.github.iampopovich.tunnelslide.ui.MenuScreen
+import io.github.iampopovich.tunnelslide.ui.Settings
 import io.github.iampopovich.tunnelslide.world.Autopilot
 import io.github.iampopovich.tunnelslide.world.HazardKind
 import io.github.iampopovich.tunnelslide.world.ObstacleField
@@ -40,7 +46,22 @@ class TunnelSlideGame(private val debug: DebugOptions = DebugOptions.NONE) : App
     private val run = RunState()
     private val fx = Effects()
     private val audio = AudioEngine()
-    private var soundOn = true
+    private val settings = Settings()
+    private val menu = MenuModel(settings)
+    private lateinit var menuView: MenuRenderer
+    /** Menu is up: the tunnel behind it is an attract-mode run driven by the bot. */
+    private var inMenu = true
+    private var clock = 0f
+    /** Back from the platform (Android back gesture), consumed on the render thread. */
+    @Volatile private var backRequested = false
+
+    fun requestBack() { backRequested = true }
+
+    private fun backPressed(): Boolean {
+        val b = backRequested || Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE) || Gdx.input.isKeyJustPressed(Input.Keys.BACK)
+        backRequested = false
+        return b
+    }
     private val surface = SurfaceUniforms()
     private val field = ObstacleField(seed = 1L)
     private var accumulator = 0f
@@ -55,12 +76,18 @@ class TunnelSlideGame(private val debug: DebugOptions = DebugOptions.NONE) : App
         tunnel = TunnelRenderer()
         blocks = BlockRenderer()
         hud = Hud()
+        menuView = MenuRenderer(hud)
         steering = SteeringInput()
+        // Back is routed by the platform launcher into requestBack(): libGDX's own catch would
+        // register a second predictive-back callback on Android 13+.
         prefs = Gdx.app.getPreferences("tunnelslide3d")
-        best = prefs.getInteger(PREF_BEST, 0)
-        surface.mono = debug.has("TS_MONO") || prefs.getBoolean(PREF_MONO, false)
-        soundOn = !debug.has("TS_NOAUDIO") && prefs.getBoolean(PREF_SOUND, true)
-        if (soundOn) audio.start()
+        loadSettings()
+        if (debug.has("TS_MONO")) settings.mono = true
+        if (debug.has("TS_NOAUDIO")) settings.sound = false
+        debug["TS_LEVEL"]?.let { n -> Level.entries.firstOrNull { it.name.equals(n, true) }?.let { settings.level = it } }
+        applySettings(save = false)
+        // Automated runs (autopilot, screenshots) skip the menu unless TS_MENU asks for it.
+        inMenu = debug.has("TS_MENU") || !(debug.has("TS_AUTOPILOT") || debug.has("TS_SCREENSHOT"))
         if (debug.has("TS_AUTOPILOT")) {
             steering.autopilot = { _ -> Autopilot.steer(run, field) }
         }
@@ -90,22 +117,88 @@ class TunnelSlideGame(private val debug: DebugOptions = DebugOptions.NONE) : App
         camera.viewportWidth = width.toFloat()
         camera.viewportHeight = height.toFloat()
         hud.resize(width, height)
+        menuView.resize(width, height)
+    }
+
+    private fun loadSettings() {
+        settings.level = Level.entries.firstOrNull { it.name == prefs.getString(PREF_LEVEL, "") } ?: Level.NORMAL
+        settings.customStart = prefs.getFloat(PREF_CUSTOM, 0.5f)
+        settings.mono = prefs.getBoolean(PREF_MONO, false)
+        settings.sound = prefs.getBoolean(PREF_SOUND, true)
+        settings.neutral = prefs.getFloat(PREF_NEUTRAL, 0f)
+    }
+
+    /** Pushes the settings into the game systems and (optionally) saves them. */
+    private fun applySettings(save: Boolean = true) {
+        surface.mono = settings.mono
+        steering.neutral = settings.neutral
+        field.curve = { z -> settings.difficultyAt(z, GameConfig.DIFFICULTY_RAMP_DISTANCE) }
+        best = prefs.getInteger(bestKey(), 0)
+        if (settings.sound) audio.start() else audio.stop()
+        if (!save) return
+        prefs.putString(PREF_LEVEL, settings.level.name)
+        prefs.putFloat(PREF_CUSTOM, settings.customStart)
+        prefs.putBoolean(PREF_MONO, settings.mono)
+        prefs.putBoolean(PREF_SOUND, settings.sound)
+        prefs.putFloat(PREF_NEUTRAL, settings.neutral)
+        prefs.flush()
+    }
+
+    /** Best distance is kept per difficulty level (NORMAL keeps the old key). */
+    private fun bestKey() = if (settings.level == Level.NORMAL) PREF_BEST else "${PREF_BEST}_${settings.level.name}"
+
+    private fun handleMenuInput(back: Boolean) {
+        val keys = Gdx.input
+        if (keys.isKeyJustPressed(Input.Keys.UP)) menu.move(-1)
+        if (keys.isKeyJustPressed(Input.Keys.DOWN)) menu.move(1)
+        var action = MenuAction.NONE
+        when {
+            keys.isKeyJustPressed(Input.Keys.ENTER) || keys.isKeyJustPressed(Input.Keys.SPACE) -> action = menu.press()
+            keys.isKeyJustPressed(Input.Keys.LEFT) && menu.items()[menu.selected].adjustable -> action = menu.press(side = -1)
+            keys.isKeyJustPressed(Input.Keys.RIGHT) && menu.items()[menu.selected].adjustable -> action = menu.press(side = 1)
+            back -> action = menu.back()
+            keys.justTouched() -> {
+                val i = menuView.hit(keys.x, keys.y)
+                if (i >= 0) action = menu.press(i, menuView.side(i, keys.x))
+            }
+        }
+        when (action) {
+            MenuAction.PLAY -> startGame()
+            MenuAction.CHANGED -> { applySettings(); audio.synth.play(Sfx.PICKUP) }
+            MenuAction.CAPTURE_NEUTRAL -> {
+                settings.neutral = steering.tiltReading()
+                applySettings()
+                audio.synth.play(Sfx.FOLD)
+            }
+            MenuAction.EXIT -> Gdx.app.exit()
+            MenuAction.NONE -> {}
+        }
+    }
+
+    private fun startGame() {
+        inMenu = false
+        newRun()
+    }
+
+    private fun openMenu() {
+        inMenu = true
+        menu.reset()
+        newRun()
     }
 
     override fun render() {
         val frame = minOf(Gdx.graphics.deltaTime, GameConfig.MAX_FRAME_TIME)
-        if (Gdx.input.isKeyJustPressed(Input.Keys.M)) {
-            // Monochrome toggle; goes into the settings menu in the menu batch.
-            surface.mono = !surface.mono
-            prefs.putBoolean(PREF_MONO, surface.mono).flush()
-        }
-        if (Gdx.input.isKeyJustPressed(Input.Keys.N)) {
-            // Sound toggle; goes into the settings menu in the menu batch.
-            soundOn = !soundOn
-            prefs.putBoolean(PREF_SOUND, soundOn).flush()
-            if (soundOn) audio.start() else audio.stop()
-        }
-        if (run.crashed) {
+        clock += frame
+        // Desktop shortcuts for the two display/sound settings.
+        if (Gdx.input.isKeyJustPressed(Input.Keys.M)) { settings.mono = !settings.mono; applySettings() }
+        if (Gdx.input.isKeyJustPressed(Input.Keys.N)) { settings.sound = !settings.sound; applySettings() }
+        val back = backPressed()
+        if (inMenu) {
+            handleMenuInput(back)
+            stepAttract(frame)
+        } else if (back) {
+            openMenu()
+        } else if (run.crashed) {
             crashAge += frame
             val wantsRestart = Gdx.input.justTouched() || Gdx.input.isKeyJustPressed(Input.Keys.SPACE)
             if (crashAge > Hud.RESTART_DELAY && wantsRestart) newRun()
@@ -140,7 +233,17 @@ class TunnelSlideGame(private val debug: DebugOptions = DebugOptions.NONE) : App
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT or GL20.GL_DEPTH_BUFFER_BIT)
         tunnel.render(camera, run, surface)
         blocks.render(camera, run, field, surface)
-        hud.render(run, best, crashAge, fx, field.hazards)
+        if (inMenu) {
+            val hint = if (menu.screen == MenuScreen.CALIBRATE) {
+                if (steering.tilt) "HOLD THE PHONE AS YOU PLAY, THEN TAP SET STRAIGHT   (TILT %+.1f)".format(steering.tiltReading() - settings.neutral)
+                else "NO TILT SENSOR ON THIS DEVICE"
+            } else if (menu.screen == MenuScreen.MAIN) {
+                if (steering.tilt) "TILT TO STEER  -  TAP TO USE A BONUS" else "ARROWS TO STEER  -  SPACE FOR BONUS  -  ESC FOR MENU"
+            } else null
+            menuView.render(menu, best, hint, clock)
+        } else {
+            hud.render(run, best, crashAge, fx, field.hazards)
+        }
         capture?.onFrameRendered()
     }
 
@@ -168,7 +271,19 @@ class TunnelSlideGame(private val debug: DebugOptions = DebugOptions.NONE) : App
 
     override fun pause() { audio.stop() }
 
-    override fun resume() { if (soundOn) audio.start() }
+    override fun resume() { if (settings.sound) audio.start() }
+
+    /** Menu background: the bot plays; when it crashes a new run starts silently. */
+    private fun stepAttract(frame: Float) {
+        if (run.crashed) { newRun(); return }
+        if (run.slot != null) run.activate(field)
+        accumulator += frame * run.timeScale
+        while (accumulator >= GameConfig.FIXED_STEP && !run.crashed) {
+            run.step(GameConfig.FIXED_STEP, Autopilot.steer(run, field), field)
+            accumulator -= GameConfig.FIXED_STEP
+        }
+        run.event = null
+    }
 
     private fun onCrash() {
         crashAge = 0f
@@ -201,6 +316,7 @@ class TunnelSlideGame(private val debug: DebugOptions = DebugOptions.NONE) : App
         tunnel.dispose()
         blocks.dispose()
         hud.dispose()
+        menuView.dispose()
     }
 
     companion object {
@@ -208,5 +324,8 @@ class TunnelSlideGame(private val debug: DebugOptions = DebugOptions.NONE) : App
         private const val PREF_BEST = "best"
         private const val PREF_MONO = "mono"
         private const val PREF_SOUND = "sound"
+        private const val PREF_LEVEL = "level"
+        private const val PREF_CUSTOM = "customStart"
+        private const val PREF_NEUTRAL = "neutral"
     }
 }

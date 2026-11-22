@@ -40,11 +40,14 @@ class SteeringInput {
         if (steer != 0f) return MathUtils.clamp(steer, -1f, 1f)
 
         if (!hasAccel) return 0f
-        val raw = -screenRightAccel() - neutral
+        val raw = tiltReading() - neutral
         val k = 1f - exp(-FILTER_RATE * dt)
         filteredTilt += (raw - filteredTilt) * k
         return shape(filteredTilt / FULL_TILT)
     }
+
+    /** Raw tilt in steering sign (calibration stores this as [neutral]). */
+    fun tiltReading(): Float = -screenRightAccel()
 
     /** Current accelerometer value along the screen-right axis, m/s^2. */
     fun screenRightAccel(): Float = when (Gdx.input.rotation) {

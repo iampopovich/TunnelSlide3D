@@ -1,6 +1,9 @@
 package io.github.iampopovich.tunnelslide
 
+import android.os.Build
 import android.os.Bundle
+import android.view.KeyEvent
+import android.window.OnBackInvokedDispatcher
 import com.badlogic.gdx.backends.android.AndroidApplication
 import com.badlogic.gdx.backends.android.AndroidApplicationConfiguration
 import io.github.iampopovich.tunnelslide.debug.DebugOptions
@@ -21,6 +24,27 @@ class AndroidLauncher : AndroidApplication() {
             DebugOptions(extras.keySet().filter { it.startsWith("TS_") }
                 .associateWith { extras.getString(it) ?: "1" })
         } else DebugOptions.NONE
-        initialize(TunnelSlideGame(debug), config)
+        val game = TunnelSlideGame(debug)
+        this.game = game
+        initialize(game, config)
+        // Android 16+ (target SDK 36+) no longer delivers KEYCODE_BACK to the app: back is a
+        // system gesture with OnBackInvokedCallback. The game decides what back means
+        // (menu up / leave a run / exit) on its own thread.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            onBackInvokedDispatcher.registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT) {
+                game.requestBack()
+            }
+        }
+    }
+
+    private var game: TunnelSlideGame? = null
+
+    /** Older Android (and hardware keys): the back key arrives as a key event. */
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.keyCode == KeyEvent.KEYCODE_BACK) {
+            if (event.action == KeyEvent.ACTION_UP) game?.requestBack()
+            return true
+        }
+        return super.dispatchKeyEvent(event)
     }
 }

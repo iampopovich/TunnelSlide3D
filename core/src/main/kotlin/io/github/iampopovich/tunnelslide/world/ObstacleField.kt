@@ -60,9 +60,12 @@ class ObstacleField(seed: Long) {
     /** Dev override (TS_DIFFICULTY): fixed difficulty instead of the distance ramp. */
     var difficultyOverride: Float? = null
 
+    /** Difficulty curve of the chosen level (menu); default is the plain 0 -> 1 ramp. */
+    var curve: ((Float) -> Float)? = null
+
     /** Difficulty 0..1 as a function of distance travelled. */
     fun difficultyAt(z: Float): Float =
-        difficultyOverride ?: MathUtils.clamp(z / GameConfig.DIFFICULTY_RAMP_DISTANCE, 0f, 1f)
+        difficultyOverride ?: curve?.invoke(z) ?: MathUtils.clamp(z / GameConfig.DIFFICULTY_RAMP_DISTANCE, 0f, 1f)
 
     /**
      * True if the player, moving from [fromZ] to [toZ] at across-position [u],
