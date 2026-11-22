@@ -48,6 +48,7 @@ class TunnelSlideGame : ApplicationAdapter() {
         if (System.getenv("TS_AUTOPILOT") != null) {
             steering.autopilot = { _ -> Autopilot.steer(run, field) }
         }
+        field.difficultyOverride = System.getenv("TS_DIFFICULTY")?.toFloatOrNull()
         newRun()
     }
 
