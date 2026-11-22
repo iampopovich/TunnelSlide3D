@@ -36,3 +36,6 @@ local.properties
 
 # Local notes (not part of the repo)
 .local/
+
+# Internal docs (plan, devlog, spec, screenshots) - local only, never commit
+docs/
