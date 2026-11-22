@@ -35,6 +35,23 @@ class ObstacleFieldTest {
     }
 
     @Test
+    fun differentSeedsGiveDifferentLayouts() {
+        val layouts = (1L..10L).map { seed ->
+            ObstacleField(seed).apply { update(0f, GameConfig.START_SPEED) }
+                .obstacles.take(6).map { (it.u * 1000).toInt() to (it.z * 10).toInt() }
+        }
+        assertTrue(layouts.toSet().size == layouts.size, "two seeds produced the same opening")
+    }
+
+    @Test
+    fun obstaclesStaySortedByZ() {
+        val field = ObstacleField(11L)
+        field.update(0f, GameConfig.START_SPEED)
+        val zs = field.obstacles.map { it.z }
+        assertTrue(zs == zs.sorted())
+    }
+
+    @Test
     fun autopilotSurvivesSeveralMinutesOnManySeeds() {
         // If the bot survives, every generated row is reachable at the configured turn rate.
         for (seed in 1L..20L) {
