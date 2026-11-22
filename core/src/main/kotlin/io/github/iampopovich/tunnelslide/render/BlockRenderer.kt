@@ -28,6 +28,8 @@ class BlockRenderer : Disposable {
     private var trails: Mesh? = null
     private var blockCount = 0
     private var trailCount = 0
+    private var pads: Mesh? = null
+    private var padCount = 0
     private var scratch = FloatArray(0)
     private var builtVersion = -1
     private var builtSeam = Float.NaN
@@ -40,6 +42,16 @@ class BlockRenderer : Disposable {
         // Warnings only for what the player is actually heading into, refreshed every frame.
         val n = if (run.crashed) 0 else
             field.threats(run.playerU, run.playerZ, GameConfig.VIEW_DISTANCE, surface.shape, threats)
+        // Bonus fields: a handful at most, rebuilt every frame (taken ones disappear).
+        val visible = field.pickups.filter { !it.taken && it.z + GameConfig.PICKUP_LENGTH > run.playerZ && it.z < run.playerZ + GameConfig.VIEW_DISTANCE }
+        padCount = visible.size
+        pads = upload(pads, visible.size) { out ->
+            var i = 0
+            for (p in visible) {
+                i = writeCube(out, i, p.u, p.z, GameConfig.PICKUP_LENGTH, GameConfig.PICKUP_HALF_WIDTH * 0.9f,
+                    0.06f, 0.03f, surface.seam, 0, 0f, 0f, 0f, 0f, p.kind.color)
+            }
+        }
         trailCount = n
         trails = upload(trails, n) { out ->
             var i = 0
@@ -70,10 +82,9 @@ class BlockRenderer : Disposable {
             Gdx.gl.glDepthMask(true)
             Gdx.gl.glDisable(GL20.GL_BLEND)
         }
-        blocks?.takeIf { blockCount > 0 }?.let {
-            shader.setUniformf("u_trail", 0f)
-            it.render(shader, GL20.GL_TRIANGLES, 0, blockCount * 36)
-        }
+        shader.setUniformf("u_trail", 0f)
+        blocks?.takeIf { blockCount > 0 }?.render(shader, GL20.GL_TRIANGLES, 0, blockCount * 36)
+        pads?.takeIf { padCount > 0 }?.render(shader, GL20.GL_TRIANGLES, 0, padCount * 36)
     }
 
     private fun rebuild(field: ObstacleField, seam: Float, playerZ: Float) {
@@ -123,12 +134,12 @@ class BlockRenderer : Disposable {
     private fun writeCube(
         out: FloatArray, start: Int, u: Float, z: Float, length: Float, halfWidth: Float,
         height: Float, lift: Float, seam: Float, colorIndex: Int,
-        mode: Float, phase: Float, sweep: Float, dir: Float,
+        mode: Float, phase: Float, sweep: Float, dir: Float, color: Color? = null,
     ): Int {
         var i = start
         val a = TunnelSurface.wrapAbs(u - seam)
         val width = halfWidth * 2f * TunnelSurface.TAU * GameConfig.TUNNEL_RADIUS
-        val c = BLOCK_COLORS[colorIndex % BLOCK_COLORS.size]
+        val c = color ?: BLOCK_COLORS[colorIndex % BLOCK_COLORS.size]
         val zRel = z - zBase
         for (v in 0 until 24) {
             for (k in 0..5) out[i++] = CUBE[v * 6 + k]
@@ -143,6 +154,7 @@ class BlockRenderer : Disposable {
     override fun dispose() {
         blocks?.dispose()
         trails?.dispose()
+        pads?.dispose()
         shader.dispose()
     }
 

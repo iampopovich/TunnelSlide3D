@@ -66,6 +66,28 @@ class ZoneTrack(seed: Long) {
         return ZoneKind.TUBE
     }
 
+    /**
+     * Space fold: if the surface at [z] is open (or opening), close it starting right here.
+     * The current episode is cut and a tube runs until the next scheduled zone.
+     * Returns false when there was nothing to fold.
+     */
+    fun fold(z: Float): Boolean {
+        val zone = zoneAt(z)
+        if (zone.kind == ZoneKind.TUBE) return false
+        val i = zones.indexOf(zone)
+        val shapeNow = shapeAt(z)
+        val cut = Zone(zone.kind, zone.start, z, zone.fromShape).also { it.seam = zone.seam }
+        val tube = Zone(ZoneKind.TUBE, z, zone.end, shapeNow).also { it.seam = zone.seam }
+        zones[i] = cut
+        zones.add(i + 1, tube)
+        // The zone after the episode used to start from its shape; now it starts from a tube.
+        if (i + 2 < zones.size) {
+            val next = zones[i + 2]
+            zones[i + 2] = Zone(next.kind, next.start, next.end, 0f).also { it.seam = next.seam }
+        }
+        return true
+    }
+
     fun zoneAt(z: Float): Zone {
         ensure(z)
         var lo = 0; var hi = zones.size - 1

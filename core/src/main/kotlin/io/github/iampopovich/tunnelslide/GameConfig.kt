@@ -63,6 +63,14 @@ object GameConfig {
     const val ROLLER_REST = 0.55f            // share of a tick the roller stands still
     const val ROUTE_TIME_WINDOW = 0.15f      // +- seconds checked around the player's arrival time
 
+    // Bonuses
+    const val PICKUP_CHANCE = 0.45f          // chance to place a bonus in the pause after a pattern
+    const val PICKUP_LENGTH = 2.2f
+    const val PICKUP_HALF_WIDTH = 1f / 48f   // one lane wide
+    const val MAX_SHIELDS = 3
+    const val SLOWMO_SCALE = 0.5f            // game clock speed while time dilation is on
+    const val SLOWMO_DURATION = 2.5f         // game seconds (5 real seconds at half speed)
+
     // Simulation
     const val FIXED_STEP = 1f / 120f
     const val MAX_FRAME_TIME = 0.25f
