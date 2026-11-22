@@ -32,10 +32,17 @@ class Hud : Disposable {
     private var labelFont: BitmapFont? = null
     private var valueFont: BitmapFont? = null
     private var bigFont: BitmapFont? = null
+    private var titleFont: BitmapFont? = null
+
+    /** Fonts shared with the menu (rebuilt on resize). */
+    val label: BitmapFont? get() = labelFont
+    val value: BitmapFont? get() = valueFont
+    val title: BitmapFont? get() = titleFont
 
     fun resize(width: Int, height: Int) {
         viewport.update(width, height, true)
-        labelFont?.dispose(); valueFont?.dispose(); bigFont?.dispose()
+        labelFont?.dispose(); valueFont?.dispose(); bigFont?.dispose(); titleFont?.dispose()
+        titleFont = font((height * 0.11f).roundToInt())
         labelFont = font((height * 0.026f).roundToInt())
         valueFont = font((height * 0.050f).roundToInt())
         bigFont = font((height * 0.070f).roundToInt())
@@ -247,7 +254,7 @@ class Hud : Disposable {
         centered(big, if (run.crashReason == CrashReason.FELL) "FELL OFF" else "CRASH", cx, h * 0.58f)
         if (age > RESTART_DELAY) {
             label.color = LABEL
-            centered(label, "TAP OR PRESS SPACE TO RESTART", cx, h * 0.44f)
+            centered(label, "TAP / SPACE: RESTART      BACK / ESC: MENU", cx, h * 0.44f)
         }
         batch.end()
     }
@@ -260,7 +267,7 @@ class Hud : Disposable {
     override fun dispose() {
         batch.dispose()
         shapes.dispose()
-        labelFont?.dispose(); valueFont?.dispose(); bigFont?.dispose()
+        labelFont?.dispose(); valueFont?.dispose(); bigFont?.dispose(); titleFont?.dispose()
         generator.dispose()
     }
 
