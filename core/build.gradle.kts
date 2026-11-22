@@ -15,6 +15,7 @@ kotlin {
 
 dependencies {
     api(libs.gdx.core)
+    api(libs.gdx.freetype)
     testImplementation(libs.kotlin.test)
 }
 
