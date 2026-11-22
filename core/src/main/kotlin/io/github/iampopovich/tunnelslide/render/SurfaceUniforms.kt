@@ -6,26 +6,27 @@ import io.github.iampopovich.tunnelslide.world.RunState
 import io.github.iampopovich.tunnelslide.world.TunnelSurface
 import io.github.iampopovich.tunnelslide.world.ZoneTrack
 
-/** Per-frame values of surface.glsl, computed once and applied to every shader. */
+/** Per-frame values shared by all surface shaders, computed once per frame. */
 class SurfaceUniforms {
-    private val ramps = FloatArray(6)
     var seam = 0f
         private set
     var playerA = 0f
         private set
-    private var base = 0f
+    var shape = 0f
+        private set
+    var mono = false
 
     fun update(run: RunState, zones: ZoneTrack) {
-        seam = zones.seamNear(run.playerZ, GameConfig.VIEW_DISTANCE)
+        // The seam only matters once the surface starts to open, i.e. right where we are.
+        seam = zones.seamNear(run.playerZ, GameConfig.ZONE_TRANSITION)
         playerA = TunnelSurface.wrapAbs(run.playerU - seam)
-        base = zones.viewRamps(run.playerZ, GameConfig.VIEW_DISTANCE, ramps)
+        shape = zones.shapeAt(run.playerZ)
     }
 
     fun apply(shader: ShaderProgram) {
         shader.setUniformf("u_radius", GameConfig.TUNNEL_RADIUS)
         shader.setUniformf("u_playerA", playerA)
-        shader.setUniformf("u_shapeBase", base)
-        shader.setUniformf("u_ramp0", ramps[0], ramps[1], ramps[2])
-        shader.setUniformf("u_ramp1", ramps[3], ramps[4], ramps[5])
+        shader.setUniformf("u_shape", shape)
+        shader.setUniformf("u_mono", if (mono) 1f else 0f)
     }
 }

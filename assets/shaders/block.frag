@@ -10,6 +10,12 @@ varying vec3 v_color;
 uniform float u_trail;       // 1 = warning trails pass, 0 = solid blocks
 uniform float u_fogDist;
 uniform vec3 u_fogColor;
+uniform float u_mono;        // 1 = monochrome mode
+
+vec3 mono(vec3 c) {
+    float lum = dot(c, vec3(0.299, 0.587, 0.114));
+    return mix(c, vec3(clamp(lum * 1.4, 0.0, 1.0)), u_mono);
+}
 
 void main() {
     if (v_dist < 0.0) discard;               // already passed
@@ -17,7 +23,7 @@ void main() {
     if (u_trail > 0.5) {
         // Strongest next to the block (far end, local z = -0.5), fading towards the player.
         float a = (0.5 - v_local.z) * 0.55 * (1.0 - fog);
-        gl_FragColor = vec4(v_color * a, a);
+        gl_FragColor = vec4(mono(v_color) * a, a);
         return;
     }
     // Neon edges: a fragment is on an edge if two of its coordinates are near a face.
@@ -26,6 +32,7 @@ void main() {
     float edge = step(2.0, e1);
     float light = 0.45 + 0.55 * max(dot(v_normal, normalize(vec3(0.3, 0.8, 0.6))), 0.0);
     vec3 col = mix(v_color * light * 0.55, vec3(1.0) * 0.4 + v_color * 0.8, edge);
+    col = mono(col);
     col = mix(col, u_fogColor, fog * fog);
     gl_FragColor = vec4(col, 1.0);
 }

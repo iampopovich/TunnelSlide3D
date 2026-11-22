@@ -30,18 +30,58 @@ enum class Pattern(
         }
     },
 
-    /** Sparse tall pillars: a breather between hard patterns. */
-    PILLARS(0f, 2f, 1f) {
+    /**
+     * Colonnade: full-span pillars from wall to wall, one per depth slot (every pillar crosses
+     * the tunnel axis, two at the same depth would intersect). Consecutive pillars turn by a
+     * fixed number of lanes, so the colonnade reads as a twisting screw, not a random star.
+     */
+    PILLARS(0f, 2f, 2f) {
         override fun build(b: PatternBuilder) {
-            val length = 50f + b.rng.nextFloat() * 30f
-            val end = b.z + length
-            val count = (length * MathUtils.lerp(0.25f, 0.6f, b.difficulty)).toInt()
-            val start = b.z
-            b.go(length * 0.5f, b.randomDrift(length * 0.5f, 0.5f))
-            b.go(length * 0.5f, b.randomDrift(length * 0.5f, 0.5f))
+            val count = 8 + b.rng.nextInt(8)
+            val spacing = MathUtils.lerp(9f, 5f, b.difficulty)
+            val turn = (1 + b.rng.nextInt(3)) * (if (b.chance(0.5f)) 1 else -1)
+            var lane = b.rng.nextInt(PatternBuilder.LANES)
             repeat(count) {
-                b.block(b.rng.nextInt(PatternBuilder.LANES), MathUtils.lerp(start, end, b.rng.nextFloat()),
-                    length = 1.2f, height = GameConfig.BLOCK_HEIGHT * 1.8f)
+                b.go(spacing, b.randomDrift(spacing, 0.7f))
+                b.pillar(lane, b.z - spacing * 0.5f)
+                lane += turn
+            }
+        }
+    },
+
+    /**
+     * Tick-tock: rows of cubes rolling lane by lane on a common beat. On a tube (inside or
+     * outside) they circle the whole circumference; on the flat they sweep from edge to edge.
+     * Neighbour rows roll in opposite directions / counter-phase.
+     */
+    TICKTOCK(0.2f, 0f, 3f) {
+        override fun build(b: PatternBuilder) {
+            val rows = 4 + b.rng.nextInt(5)
+            val spacing = MathUtils.lerp(10f, 6f, b.difficulty)
+            repeat(rows) { row ->
+                b.go(spacing, b.randomDrift(spacing, 0.6f))
+                val z = b.z - spacing * 0.5f
+                val seamLane = b.seamLaneHere()
+                if (seamLane == null) {
+                    // Circle: evenly spaced cubes moving together, so they never overlap.
+                    val gap = MathUtils.lerp(8f, 3f, b.difficulty).toInt() + b.rng.nextInt(2)
+                    val dir = if (row % 2 == 0) 1 else -1
+                    val start = b.rng.nextInt(gap)
+                    var lane = start
+                    while (lane < PatternBuilder.LANES - gap / 2) {
+                        b.roller(lane, z, phase = 0f, dir = dir)
+                        lane += gap
+                    }
+                } else {
+                    // Flat: the usable width is between the edges; split it into sweep tracks.
+                    val width = PatternBuilder.LANES - 2
+                    val tracks = if (b.chance(0.4f)) 1 else 2 + b.rng.nextInt(2)
+                    val len = width / tracks
+                    for (t in 0 until tracks) {
+                        val home = seamLane + 1 + t * len
+                        b.roller(home, z, phase = b.rng.nextInt(2 * (len - 1)).toFloat(), sweepLanes = len)
+                    }
+                }
             }
         }
     },

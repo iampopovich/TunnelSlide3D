@@ -3,7 +3,6 @@ precision mediump float;
 #endif
 
 varying vec2 v_coord;
-varying float v_shape;
 
 uniform float u_uOffset;     // seam position, reduced modulo the pattern period
 uniform float u_zOffset;     // player z, reduced modulo the pattern period
@@ -11,6 +10,8 @@ uniform float u_lanes;
 uniform float u_ringLen;
 uniform float u_fogDist;
 uniform vec3 u_fogColor;
+uniform float u_shape;
+uniform float u_mono;        // 1 = monochrome mode
 
 void main() {
     float dist = v_coord.y;
@@ -19,10 +20,9 @@ void main() {
 
     float fog = clamp(dist / u_fogDist, 0.0, 1.0);
 
-    // Panel edges: thin bright lines across and along the tunnel.
+    // Thin lines; they fade out with distance before they start to alias.
     float eu = abs(fract(lu) - 0.5);
     float ez = abs(fract(lz) - 0.5);
-    // Thin lines; they fade out with distance before they start to alias.
     float lineU = smoothstep(0.455, 0.49, eu);
     float lineZ = smoothstep(0.47, 0.495, ez);
     // Right under the camera a line covers half the screen: dim it there.
@@ -40,10 +40,14 @@ void main() {
     vec3 col = mix(base, lineColor, line);
 
     // Open surface: hot red edges along the cut, fading in with the morph.
-    float open = clamp(1.0 - abs(v_shape - 1.0) / 0.65, 0.0, 1.0);
+    float open = clamp(1.0 - abs(u_shape - 1.0) / 0.65, 0.0, 1.0);
     float edgeDist = min(v_coord.x, 1.0 - v_coord.x) * u_lanes;   // in lanes
     float edge = (1.0 - smoothstep(0.0, 0.35, edgeDist)) * open;
     col = mix(col, vec3(1.0, 0.25, 0.2), edge);
+
+    // Monochrome: luminance with a contrast boost so lines still pop.
+    float lum = dot(col, vec3(0.299, 0.587, 0.114));
+    col = mix(col, vec3(clamp(lum * 1.6, 0.0, 1.0)), u_mono);
 
     col = mix(col, u_fogColor, fog * fog);
     gl_FragColor = vec4(col, 1.0);

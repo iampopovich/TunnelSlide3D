@@ -27,12 +27,11 @@ class GeneratorTest {
 
     @Test
     fun routeIsNeverBlocked() {
-        drive(9L, 60f) { run, field ->
-            for (o in field.obstacles) {
-                if (o.z > run.playerZ + 1f) break
-                if (o.z + o.length < run.playerZ || o.z > run.playerZ + 0.5f) continue
-                val gap = abs(TunnelSurface.wrapRel(o.u - field.path.uAt(run.playerZ)))
-                assertTrue(gap >= o.halfWidth + GameConfig.PLAYER_HALF_WIDTH, "route blocked at z=${run.playerZ}")
+        for (seed in listOf(9L, 31L)) drive(seed, 150f) { run, field ->
+            // At any moment and any surface shape, standing exactly on the route is safe.
+            val z = run.playerZ
+            for (shape in floatArrayOf(0f, 1f)) {
+                assertTrue(!field.hits(field.path.uAt(z), z, z + 0.01f, run.time, shape), "route blocked at z=$z")
             }
         }
     }

@@ -22,7 +22,7 @@ class ObstacleFieldTest {
         field.update(0f, GameConfig.START_SPEED)
         val o = field.obstacles.first()
         assertTrue(field.hits(o.u, o.z - 0.1f, o.z + 0.1f))
-        assertFalse(field.hits(TunnelSurface.wrapAbs(o.u + 0.5f + 0.01f), o.z - 50f, o.z - 40f))
+        assertFalse(field.hits(TunnelSurface.wrapAbs(o.u + 0.25f), o.z - 50f, o.z - 40f, 0f, 1f))
     }
 
     @Test

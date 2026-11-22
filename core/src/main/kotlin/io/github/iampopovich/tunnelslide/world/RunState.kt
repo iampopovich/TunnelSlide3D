@@ -12,16 +12,18 @@ class RunState {
     /** Absolute position across the tunnel, [0, 1). */
     var playerU = 0f
         private set
-    /** Distance travelled along the tunnel. */
-    var playerZ = 0f
-        private set
+    /** Distance travelled along the tunnel (accumulated in double: long runs must not drift). */
+    private var zAcc = 0.0
+    val playerZ: Float get() = zAcc.toFloat()
     var speed = GameConfig.START_SPEED
         private set
     /** Current turn rate, revolutions per second (+ = right). */
     var turnRate = 0f
         private set
-    var time = 0f
-        private set
+    /** Game time = fixed steps taken; exact, so moving obstacles stay in sync with predictions. */
+    private var steps = 0L
+    private var dtSum = 0.0
+    val time: Float get() = dtSum.toFloat()
     var crashReason: CrashReason? = null
         private set
     val crashed: Boolean get() = crashReason != null
@@ -29,22 +31,24 @@ class RunState {
     val score: Int get() = playerZ.toInt()
 
     fun reset() {
-        playerU = 0f; playerZ = 0f; speed = GameConfig.START_SPEED; turnRate = 0f; time = 0f
+        playerU = 0f; zAcc = 0.0; speed = GameConfig.START_SPEED; turnRate = 0f; steps = 0L; dtSum = 0.0
         crashReason = null
     }
 
     /** @param steer -1 (full left) .. 1 (full right) */
     fun step(dt: Float, steer: Float, field: ObstacleField? = null) {
         if (crashed) return
-        time += dt
+        steps++
+        dtSum += dt
         val target = MathUtils.clamp(steer, -1f, 1f) * GameConfig.MAX_TURN_RATE
         val k = 1f - exp(-GameConfig.TURN_RESPONSE * dt)
         turnRate += (target - turnRate) * k
         val oldU = playerU
         playerU = TunnelSurface.wrapAbs(playerU + turnRate * dt)
-        speed = minOf(GameConfig.MAX_SPEED, speed + GameConfig.ACCELERATION * dt)
+        // Speed is a closed-form function of time (no float accumulation), see Kinematics.
+        speed = minOf(GameConfig.MAX_SPEED, (GameConfig.START_SPEED + GameConfig.ACCELERATION * dtSum).toFloat())
         val fromZ = playerZ
-        playerZ += speed * dt
+        zAcc += speed.toDouble() * dt
         if (field == null) return
         field.update(playerZ, speed)
         if (field.zones.isOpen(playerZ)) {
@@ -54,6 +58,6 @@ class RunState {
             val a1 = TunnelSurface.wrapAbs(playerU - seam)
             if (abs(a1 - a0) > 0.5f) { crashReason = CrashReason.FELL; return }
         }
-        if (field.hits(playerU, fromZ, playerZ)) crashReason = CrashReason.HIT
+        if (field.hits(playerU, fromZ, playerZ, time, field.zones.shapeAt(playerZ))) crashReason = CrashReason.HIT
     }
 }

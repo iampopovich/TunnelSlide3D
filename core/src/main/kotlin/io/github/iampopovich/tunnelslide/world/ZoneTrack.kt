@@ -7,8 +7,9 @@ import io.github.iampopovich.tunnelslide.GameConfig
 enum class ZoneKind(val shape: Float) { TUBE(0f), FLAT(1f), OUTSIDE(2f) }
 
 /**
- * A stretch of the run with one surface shape. The first [GameConfig.ZONE_TRANSITION]
- * units of a zone blend from the previous shape. [seam] is where the ribbon is cut when
+ * A stretch of the run with one surface shape. While the player covers the first
+ * [GameConfig.ZONE_TRANSITION] units of a zone, the WHOLE visible surface morphs from the
+ * previous shape in real time (the shape is a function of the player's position only). [seam] is where the ribbon is cut when
  * the surface is open; it is chosen when the route first reaches the zone.
  */
 class Zone(val kind: ZoneKind, val start: Float, val end: Float, val fromShape: Float) {
@@ -75,7 +76,7 @@ class ZoneTrack(seed: Long) {
         return zones[lo]
     }
 
-    /** Surface shape at [z] (0 tube .. 1 flat .. 2 outside). */
+    /** Surface shape when the player is at [z] (0 tube .. 1 flat .. 2 outside). */
     fun shapeAt(z: Float): Float {
         val zone = zoneAt(z)
         val t = (z - zone.start) / GameConfig.ZONE_TRANSITION
@@ -101,36 +102,6 @@ class ZoneTrack(seed: Long) {
             if (zone.kind != ZoneKind.TUBE && zone.seam != null) return zone.seam!!
         }
         return zoneAt(z).seam ?: 0f
-    }
-
-    /**
-     * Shape transitions as the tunnel shader sees them: base shape at the player plus up to
-     * two ramps (start distance, length, delta). Must reproduce [shapeAt] over the view.
-     */
-    fun viewRamps(playerZ: Float, view: Float, out: FloatArray): Float {
-        java.util.Arrays.fill(out, 0f)
-        ensure(playerZ + view)
-        val first = zoneAt(playerZ)
-        val base: Float
-        var n = 0
-        val tr = GameConfig.ZONE_TRANSITION
-        if (playerZ < first.start + tr) {
-            base = first.fromShape
-            n = addRamp(out, n, first.start - playerZ, tr, first.kind.shape - first.fromShape)
-        } else {
-            base = first.kind.shape
-        }
-        for (zone in zones) {
-            if (zone.start <= first.start) continue
-            if (zone.start > playerZ + view || n >= 2) break
-            n = addRamp(out, n, zone.start - playerZ, tr, zone.kind.shape - zone.fromShape)
-        }
-        return base
-    }
-
-    private fun addRamp(out: FloatArray, n: Int, start: Float, len: Float, delta: Float): Int {
-        out[n * 3] = start; out[n * 3 + 1] = len; out[n * 3 + 2] = delta
-        return n + 1
     }
 
     companion object {

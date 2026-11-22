@@ -20,6 +20,7 @@ import io.github.iampopovich.tunnelslide.world.Autopilot
 import io.github.iampopovich.tunnelslide.world.ObstacleField
 import io.github.iampopovich.tunnelslide.world.RunState
 import io.github.iampopovich.tunnelslide.world.ZoneKind
+import io.github.iampopovich.tunnelslide.world.gen.Pattern
 
 /** Entry point shared by all platforms. */
 class TunnelSlideGame(private val debug: DebugOptions = DebugOptions.NONE) : ApplicationAdapter() {
@@ -49,10 +50,14 @@ class TunnelSlideGame(private val debug: DebugOptions = DebugOptions.NONE) : App
         steering = SteeringInput()
         prefs = Gdx.app.getPreferences("tunnelslide3d")
         best = prefs.getInteger(PREF_BEST, 0)
+        surface.mono = debug.has("TS_MONO") || prefs.getBoolean(PREF_MONO, false)
         if (debug.has("TS_AUTOPILOT")) {
             steering.autopilot = { _ -> Autopilot.steer(run, field) }
         }
         field.difficultyOverride = debug["TS_DIFFICULTY"]?.toFloatOrNull()
+        field.forcedPattern = debug["TS_PATTERN"]?.let { name ->
+            Pattern.entries.firstOrNull { it.name.equals(name, ignoreCase = true) }
+        }
         field.zones.forcedFirst = debug["TS_ZONE"]?.let { name ->
             ZoneKind.entries.firstOrNull { it.name.equals(name, ignoreCase = true) }
         }
@@ -75,6 +80,11 @@ class TunnelSlideGame(private val debug: DebugOptions = DebugOptions.NONE) : App
 
     override fun render() {
         val frame = minOf(Gdx.graphics.deltaTime, GameConfig.MAX_FRAME_TIME)
+        if (Gdx.input.isKeyJustPressed(Input.Keys.M)) {
+            // Monochrome toggle; goes into the settings menu in the menu batch.
+            surface.mono = !surface.mono
+            prefs.putBoolean(PREF_MONO, surface.mono).flush()
+        }
         if (run.crashed) {
             crashAge += frame
             val wantsRestart = Gdx.input.justTouched() || Gdx.input.isKeyJustPressed(Input.Keys.SPACE)
@@ -146,5 +156,6 @@ class TunnelSlideGame(private val debug: DebugOptions = DebugOptions.NONE) : App
     companion object {
         const val TAG = "TunnelSlide3D"
         private const val PREF_BEST = "best"
+        private const val PREF_MONO = "mono"
     }
 }
