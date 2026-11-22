@@ -12,6 +12,8 @@ enum class BonusKind(val label: String, val color: Color) {
     SLOWMO("TIME", Color(0.25f, 0.55f, 1.00f, 1f)),
     /** Green: ends the current flat / outside episode (and hazard zones later). Slot, tap. */
     FOLD("FOLD", Color(0.25f, 1.00f, 0.45f, 1f)),
+    /** Not a bonus: a plasma vortex. Touching it wipes shields and the slot. */
+    VORTEX("VORTEX", Color(0.85f, 0.25f, 1.00f, 1f)),
 }
 
 /** A bonus field on the surface; [u] is its centre, [z] its near edge. */

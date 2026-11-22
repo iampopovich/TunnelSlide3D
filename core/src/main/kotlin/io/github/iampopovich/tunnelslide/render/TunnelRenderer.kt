@@ -36,7 +36,6 @@ class TunnelRenderer : Disposable {
         shader.setUniformf("u_zOffset", zOffset)
         shader.setUniformf("u_lanes", lanes)
         shader.setUniformf("u_ringLen", ringLen)
-        shader.setUniformf("u_fogDist", GameConfig.VIEW_DISTANCE)
         shader.setUniformf("u_fogColor", Palette.FOG.r, Palette.FOG.g, Palette.FOG.b)
         mesh.render(shader, GL20.GL_TRIANGLES)
     }

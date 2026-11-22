@@ -71,6 +71,17 @@ object GameConfig {
     const val SLOWMO_SCALE = 0.5f            // game clock speed while time dilation is on
     const val SLOWMO_DURATION = 2.5f         // game seconds (5 real seconds at half speed)
 
+    // Hazard zones
+    const val HAZARD_FIRST = 900f
+    const val HAZARD_MIN = 250f
+    const val HAZARD_MAX = 450f
+    const val HAZARD_GAP_MIN = 500f          // at full difficulty
+    const val HAZARD_GAP_MAX = 1100f
+    const val HAZARD_RAMP = 30f              // fade in/out distance
+    const val GRAVITY_PULL = 0.25f           // share of the max turn rate
+    const val GRAVITY_FOG = 0.45f            // view distance multiplier inside a gravity well
+    const val VORTICES_PER_PATTERN = 3
+
     // Simulation
     const val FIXED_STEP = 1f / 120f
     const val MAX_FRAME_TIME = 0.25f

@@ -13,6 +13,7 @@ import com.badlogic.gdx.utils.viewport.ScreenViewport
 import io.github.iampopovich.tunnelslide.GameConfig
 import io.github.iampopovich.tunnelslide.world.BonusKind
 import io.github.iampopovich.tunnelslide.world.CrashReason
+import io.github.iampopovich.tunnelslide.world.HazardTrack
 import io.github.iampopovich.tunnelslide.world.RunState
 import kotlin.math.roundToInt
 
@@ -52,7 +53,7 @@ class Hud : Disposable {
     }
 
     /** @param crashAge seconds since the crash, or negative while running */
-    fun render(run: RunState, best: Int, crashAge: Float, fx: Effects? = null) {
+    fun render(run: RunState, best: Int, crashAge: Float, fx: Effects? = null, hazards: HazardTrack? = null) {
         viewport.apply()
         // The 3D pass leaves depth testing on; 2D overlays at equal depth would hide the text.
         Gdx.gl.glDisable(GL20.GL_DEPTH_TEST)
@@ -68,6 +69,7 @@ class Hud : Disposable {
         drawBonusShapes(panel, run)
         drawPanelText(panel, run, best)
         drawBonusText(panel, run)
+        if (hazards != null && crashAge < 0f) drawHazardLabel(panel, run, hazards)
         if (crashAge >= 0f) drawCrashText(run, crashAge)
         Gdx.gl.glDisable(GL20.GL_BLEND)
     }
@@ -213,6 +215,17 @@ class Hud : Disposable {
         label.color = kind.color
         layout.setText(label, kind.label)
         label.draw(batch, layout, p.right - p.chamfer - p.width * 0.06f - r * 2f - layout.width, y)
+        batch.end()
+    }
+
+    /** Name of the active hazard, centred under the panel, fading with the hazard. */
+    private fun drawHazardLabel(p: Panel, run: RunState, hazards: HazardTrack) {
+        val h = hazards.at(run.playerZ) ?: return
+        val k = hazards.intensity(run.playerZ)
+        val label = labelFont ?: return
+        batch.begin()
+        label.color = Color(h.kind.color.r, h.kind.color.g, h.kind.color.b, k)
+        centered(label, h.kind.label, (p.left + p.right) / 2f, p.bottom - p.height * 0.12f)
         batch.end()
     }
 

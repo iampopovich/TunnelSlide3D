@@ -12,6 +12,16 @@ uniform float u_fogDist;
 uniform vec3 u_fogColor;
 uniform float u_shape;
 uniform float u_mono;        // 1 = monochrome mode
+uniform float u_invertTunnel; // blackout hazard, 0..1
+uniform float u_hueAmount;   // hue-shift hazard, 0..1
+uniform float u_hueAngle;
+
+// Rotates the hue of c by angle a (Rodrigues rotation around the grey axis).
+vec3 hueRotate(vec3 c, float a) {
+    vec3 k = vec3(0.57735);
+    float ca = cos(a);
+    return c * ca + cross(k, c) * sin(a) + k * dot(k, c) * (1.0 - ca);
+}
 
 void main() {
     float dist = v_coord.y;
@@ -45,10 +55,16 @@ void main() {
     float edge = (1.0 - smoothstep(0.0, 0.35, edgeDist)) * open;
     col = mix(col, vec3(1.0, 0.25, 0.2), edge);
 
+    // Hazards: disco (saturated, hue cycling with the distance) and blackout (negative).
+    vec3 disco = hueRotate(col * 1.6 + vec3(0.25, 0.0, 0.2), u_hueAngle + lz * 0.35);
+    col = mix(col, clamp(disco, 0.0, 1.0), u_hueAmount);
+    col = mix(col, vec3(1.0) - col, u_invertTunnel);
+
     // Monochrome: luminance with a contrast boost so lines still pop.
     float lum = dot(col, vec3(0.299, 0.587, 0.114));
     col = mix(col, vec3(clamp(lum * 1.6, 0.0, 1.0)), u_mono);
 
-    col = mix(col, u_fogColor, fog * fog);
+    vec3 fogColor = mix(u_fogColor, vec3(0.85), u_invertTunnel);
+    col = mix(col, fogColor, fog * fog);
     gl_FragColor = vec4(col, 1.0);
 }
