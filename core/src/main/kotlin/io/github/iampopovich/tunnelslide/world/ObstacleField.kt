@@ -23,6 +23,9 @@ class ObstacleField(seed: Long) {
     val history = ArrayList<Pattern>()
 
     val obstacles: Collection<Obstacle> get() = items
+    private val pickupList = ArrayDeque<Pickup>()
+    val pickups: Collection<Pickup> get() = pickupList
+    internal fun pickupsForTest(): ArrayDeque<Pickup> = pickupList
     /** Bumped whenever blocks are added, so renderers know when to rebuild their buffers. */
     var version = 0
         private set
@@ -31,7 +34,7 @@ class ObstacleField(seed: Long) {
 
     fun reset(seed: Long) {
         rng.setSeed(seed)
-        items.clear(); history.clear(); path.clear()
+        items.clear(); history.clear(); path.clear(); pickupList.clear()
         version++
         zones.reset(seed xor 0x5EEDL)
         // Straight run-up from the start; the first route point can be anywhere,
@@ -45,6 +48,7 @@ class ObstacleField(seed: Long) {
     fun update(playerZ: Float, speed: Float) {
         while (path.lastZ < playerZ + GameConfig.VIEW_DISTANCE + 20f) spawnPattern(playerZ, speed)
         while (items.isNotEmpty() && items.first().z + items.first().length < playerZ - 2f) items.removeFirst()
+        while (pickupList.isNotEmpty() && pickupList.first().z + GameConfig.PICKUP_LENGTH < playerZ - 2f) pickupList.removeFirst()
         path.trimBefore(playerZ - 5f)
     }
 
@@ -62,13 +66,39 @@ class ObstacleField(seed: Long) {
      * True if the player, moving from [fromZ] to [toZ] at across-position [u],
      * touches any obstacle. Sweeping the z interval avoids tunnelling at high speed.
      */
-    fun hits(u: Float, fromZ: Float, toZ: Float, time: Float = 0f, shape: Float = 0f): Boolean {
+    fun hits(u: Float, fromZ: Float, toZ: Float, time: Float = 0f, shape: Float = 0f): Boolean =
+        firstHit(u, fromZ, toZ, time, shape) != null
+
+    fun firstHit(u: Float, fromZ: Float, toZ: Float, time: Float, shape: Float): Obstacle? {
         for (o in items) {
             if (o.z > toZ + GameConfig.PLAYER_LENGTH) break   // sorted by z
             if (o.z + o.length < fromZ) continue
-            if (o.overlapsU(u, GameConfig.PLAYER_HALF_WIDTH, time, shape)) return true
+            if (o.overlapsU(u, GameConfig.PLAYER_HALF_WIDTH, time, shape)) return o
         }
-        return false
+        return null
+    }
+
+    /** Removes one obstacle (smashed by a shield). */
+    fun destroy(o: Obstacle) {
+        if (items.remove(o)) version++
+    }
+
+    /** Quake: removes everything from [fromZ] to [toZ]. Returns how many obstacles were destroyed. */
+    fun quake(fromZ: Float, toZ: Float): Int {
+        val before = items.size
+        items.removeAll { it.z + it.length >= fromZ && it.z <= toZ }
+        if (items.size != before) version++
+        return before - items.size
+    }
+
+    /** First bonus field the player touches while moving from [fromZ] to [toZ] at [u]. */
+    fun pickupAt(u: Float, fromZ: Float, toZ: Float): Pickup? {
+        for (p in pickupList) {
+            if (p.z > toZ) break
+            if (p.taken || p.z + GameConfig.PICKUP_LENGTH < fromZ) continue
+            if (kotlin.math.abs(TunnelSurface.wrapRel(p.u - u)) < GameConfig.PICKUP_HALF_WIDTH + GameConfig.PLAYER_HALF_WIDTH) return p
+        }
+        return null
     }
 
     /** One warning: the dangerous spot of an obstacle the player is heading into. */
@@ -98,6 +128,7 @@ class ObstacleField(seed: Long) {
         val pause = MathUtils.lerp(GameConfig.PATTERN_PAUSE_EASY, GameConfig.PATTERN_PAUSE_HARD, d)
         val pauseZ = path.lastZ + pause
         zones.ensure(pauseZ + PATTERN_MAX_LENGTH)
+        maybePlacePickup(path.lastZ, pauseZ)
         PatternBuilder.claimSeams(zones, path.lastZ, pauseZ, path.lastU)
         path.add(pauseZ, path.lastU)
 
@@ -116,6 +147,22 @@ class ObstacleField(seed: Long) {
             .sortedBy { it.z }
             .forEach { insertSorted(it) }
         version++
+    }
+
+    /** Puts a bonus field on the route in the empty stretch between two patterns. */
+    private fun maybePlacePickup(fromZ: Float, toZ: Float) {
+        if (fromZ < GameConfig.FIRST_ROW_DISTANCE || toZ - fromZ < GameConfig.PICKUP_LENGTH * 3f) return
+        if (rng.nextFloat() >= GameConfig.PICKUP_CHANCE) return
+        val z = MathUtils.lerp(fromZ, toZ - GameConfig.PICKUP_LENGTH, 0.5f)
+        val r = rng.nextFloat()
+        val kind = when {
+            r < 0.40f -> BonusKind.SHIELD
+            r < 0.60f -> BonusKind.QUAKE
+            r < 0.80f -> BonusKind.SLOWMO
+            else -> BonusKind.FOLD
+        }
+        // The route is straight inside the pause, so its u here is exact.
+        pickupList.addLast(Pickup(path.lastU, z, kind))
     }
 
     private fun pick(d: Float): Pattern {

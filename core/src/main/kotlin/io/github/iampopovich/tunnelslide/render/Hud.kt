@@ -11,6 +11,7 @@ import com.badlogic.gdx.graphics.glutils.ShapeRenderer
 import com.badlogic.gdx.utils.Disposable
 import com.badlogic.gdx.utils.viewport.ScreenViewport
 import io.github.iampopovich.tunnelslide.GameConfig
+import io.github.iampopovich.tunnelslide.world.BonusKind
 import io.github.iampopovich.tunnelslide.world.CrashReason
 import io.github.iampopovich.tunnelslide.world.RunState
 import kotlin.math.roundToInt
@@ -51,7 +52,7 @@ class Hud : Disposable {
     }
 
     /** @param crashAge seconds since the crash, or negative while running */
-    fun render(run: RunState, best: Int, crashAge: Float) {
+    fun render(run: RunState, best: Int, crashAge: Float, fx: Effects? = null) {
         viewport.apply()
         // The 3D pass leaves depth testing on; 2D overlays at equal depth would hide the text.
         Gdx.gl.glDisable(GL20.GL_DEPTH_TEST)
@@ -61,9 +62,12 @@ class Hud : Disposable {
         batch.projectionMatrix = viewport.camera.combined
 
         if (crashAge >= 0f) drawCrashVeil(crashAge)
+        drawScreenTints(run, fx)
         val panel = panelGeometry()
         drawPanelShapes(panel, run)
+        drawBonusShapes(panel, run)
         drawPanelText(panel, run, best)
+        drawBonusText(panel, run)
         if (crashAge >= 0f) drawCrashText(run, crashAge)
         Gdx.gl.glDisable(GL20.GL_BLEND)
     }
@@ -151,6 +155,64 @@ class Hud : Disposable {
 
         label.color = FPS
         label.draw(batch, "FPS ${Gdx.graphics.framesPerSecond}", 12f, 12f + label.capHeight)
+        batch.end()
+    }
+
+    /** Fading flash from bonus events and a blue frame while time dilation is on. */
+    private fun drawScreenTints(run: RunState, fx: Effects?) {
+        val w = viewport.worldWidth
+        val h = viewport.worldHeight
+        shapes.begin(ShapeRenderer.ShapeType.Filled)
+        if (fx != null && fx.flash.a > 0.001f) {
+            shapes.color = fx.flash
+            shapes.rect(0f, 0f, w, h)
+        }
+        if (run.slowLeft > 0f) {
+            val c = BonusKind.SLOWMO.color
+            val edge = h * 0.06f
+            val a = 0.35f * minOf(1f, run.slowLeft * 2f)
+            val solid = Color(c.r, c.g, c.b, a)
+            val clear = Color(c.r, c.g, c.b, 0f)
+            shapes.rect(0f, 0f, w, edge, solid, solid, clear, clear)
+            shapes.rect(0f, h - edge, w, edge, clear, clear, solid, solid)
+            shapes.rect(0f, 0f, edge, h, solid, clear, clear, solid)
+            shapes.rect(w - edge, 0f, edge, h, clear, solid, solid, clear)
+        }
+        shapes.end()
+    }
+
+    /** Shield pips (left wing) and the bonus slot (right wing), hanging under the panel. */
+    private fun drawBonusShapes(p: Panel, run: RunState) {
+        val r = p.height * 0.11f
+        val y = p.bottom - r * 1.9f
+        shapes.begin(ShapeRenderer.ShapeType.Filled)
+        val shield = BonusKind.SHIELD.color
+        for (k in 0 until GameConfig.MAX_SHIELDS) {
+            val cx = p.left + p.chamfer + p.width * 0.06f + k * r * 2.6f
+            shapes.color = if (k < run.shields) shield else BAR_BACK
+            diamond(cx, y, r)
+        }
+        run.slot?.let { kind ->
+            shapes.color = kind.color
+            diamond(p.right - p.chamfer - p.width * 0.06f, y, r * 1.2f)
+        }
+        shapes.end()
+    }
+
+    private fun diamond(cx: Float, cy: Float, r: Float) {
+        shapes.triangle(cx - r, cy, cx, cy + r, cx + r, cy)
+        shapes.triangle(cx - r, cy, cx, cy - r, cx + r, cy)
+    }
+
+    private fun drawBonusText(p: Panel, run: RunState) {
+        val label = labelFont ?: return
+        val kind = run.slot ?: return
+        val r = p.height * 0.11f
+        val y = p.bottom - r * 1.9f + label.capHeight / 2f
+        batch.begin()
+        label.color = kind.color
+        layout.setText(label, kind.label)
+        label.draw(batch, layout, p.right - p.chamfer - p.width * 0.06f - r * 2f - layout.width, y)
         batch.end()
     }
 

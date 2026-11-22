@@ -20,6 +20,8 @@ class SteeringInput {
 
     private var filteredTilt = 0f
     private val hasAccel = Gdx.input.isPeripheralAvailable(Input.Peripheral.Accelerometer)
+    /** True when steering is by tilting the device. */
+    val tilt: Boolean get() = hasAccel
 
     fun read(dt: Float, time: Float): Float {
         autopilot?.let { return it(time) }
@@ -29,8 +31,9 @@ class SteeringInput {
         if (Gdx.input.isKeyPressed(Input.Keys.RIGHT) || Gdx.input.isKeyPressed(Input.Keys.D)) steer += 1f
         if (steer != 0f) return steer
 
-        // Touch fallback: hold left/right half of the screen.
-        for (p in 0 until 4) {
+        // Touch fallback (no accelerometer): hold left/right half of the screen.
+        // With tilt steering, taps are reserved for bonuses.
+        if (!hasAccel) for (p in 0 until 4) {
             if (!Gdx.input.isTouched(p)) continue
             steer += if (Gdx.input.getX(p) < Gdx.graphics.width / 2) -1f else 1f
         }

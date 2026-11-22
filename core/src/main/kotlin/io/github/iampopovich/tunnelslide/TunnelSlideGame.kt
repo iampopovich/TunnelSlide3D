@@ -12,6 +12,7 @@ import io.github.iampopovich.tunnelslide.debug.DebugCapture
 import io.github.iampopovich.tunnelslide.debug.DebugOptions
 import io.github.iampopovich.tunnelslide.input.SteeringInput
 import io.github.iampopovich.tunnelslide.render.BlockRenderer
+import io.github.iampopovich.tunnelslide.render.Effects
 import io.github.iampopovich.tunnelslide.render.Hud
 import io.github.iampopovich.tunnelslide.render.Palette
 import io.github.iampopovich.tunnelslide.render.SurfaceUniforms
@@ -33,6 +34,7 @@ class TunnelSlideGame(private val debug: DebugOptions = DebugOptions.NONE) : App
     private lateinit var steering: SteeringInput
     private lateinit var prefs: Preferences
     private val run = RunState()
+    private val fx = Effects()
     private val surface = SurfaceUniforms()
     private val field = ObstacleField(seed = 1L)
     private var accumulator = 0f
@@ -70,6 +72,7 @@ class TunnelSlideGame(private val debug: DebugOptions = DebugOptions.NONE) : App
         field.update(run.playerZ, run.speed)
         accumulator = 0f
         crashAge = -1f
+        fx.reset()
     }
 
     override fun resize(width: Int, height: Int) {
@@ -90,7 +93,13 @@ class TunnelSlideGame(private val debug: DebugOptions = DebugOptions.NONE) : App
             val wantsRestart = Gdx.input.justTouched() || Gdx.input.isKeyJustPressed(Input.Keys.SPACE)
             if (crashAge > Hud.RESTART_DELAY && wantsRestart) newRun()
         } else {
-            accumulator += frame
+            // Bonus: SPACE on desktop, a tap on phones (tilt steers there).
+            if (Gdx.input.isKeyJustPressed(Input.Keys.SPACE) || (steering.tilt && Gdx.input.justTouched()) ||
+                debug.has("TS_AUTOBONUS") && run.slot != null) {
+                run.activate(field)
+            }
+            // Time dilation slows the game clock itself, so obstacle timing stays consistent.
+            accumulator += frame * run.timeScale
             val steer = steering.read(frame, run.time)
             logSensors(frame, steer)
             while (accumulator >= GameConfig.FIXED_STEP && !run.crashed) {
@@ -98,7 +107,9 @@ class TunnelSlideGame(private val debug: DebugOptions = DebugOptions.NONE) : App
                 accumulator -= GameConfig.FIXED_STEP
             }
             if (run.crashed) onCrash()
+            run.event?.let { fx.trigger(it); run.event = null }
         }
+        fx.update(frame)
 
         updateCamera()
         Gdx.gl.glClearColor(Palette.FOG.r, Palette.FOG.g, Palette.FOG.b, 1f)
@@ -106,7 +117,7 @@ class TunnelSlideGame(private val debug: DebugOptions = DebugOptions.NONE) : App
         surface.update(run, field.zones)
         tunnel.render(camera, run, surface)
         blocks.render(camera, run, field, surface)
-        hud.render(run, best, crashAge)
+        hud.render(run, best, crashAge, fx)
         capture?.onFrameRendered()
     }
 
@@ -126,6 +137,7 @@ class TunnelSlideGame(private val debug: DebugOptions = DebugOptions.NONE) : App
     private fun onCrash() {
         crashAge = 0f
         Gdx.input.vibrate(120)
+        fx.reset()
         if (run.score > best) {
             best = run.score
             prefs.putInteger(PREF_BEST, best).flush()
@@ -138,7 +150,7 @@ class TunnelSlideGame(private val debug: DebugOptions = DebugOptions.NONE) : App
             GameConfig.MAX_FOV,
             GameConfig.BASE_FOV + (run.speed - GameConfig.START_SPEED) * GameConfig.FOV_PER_SPEED,
         )
-        camera.position.set(0f, eyeY, 0f)
+        camera.position.set(fx.shakeX, eyeY + fx.shakeY, 0f)
         camera.direction.set(0f, -0.06f, -1f).nor()
         camera.up.set(0f, 1f, 0f)
         // Roll slightly into the turn: makes steering readable even in a symmetric tube.
