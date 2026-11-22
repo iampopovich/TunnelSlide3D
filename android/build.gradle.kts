@@ -11,6 +11,7 @@ val nativeConfigs = abis.associateWith { abi ->
 }
 nativeConfigs.forEach { (abi, cfg) ->
     dependencies.add(cfg.name, "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-$abi")
+    dependencies.add(cfg.name, "com.badlogicgames.gdx:gdx-freetype-platform:$gdxVersion:natives-$abi")
 }
 
 val nativesDir = layout.buildDirectory.dir("gdx-natives")
