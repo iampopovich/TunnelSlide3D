@@ -11,6 +11,7 @@ import com.badlogic.gdx.graphics.glutils.ShapeRenderer
 import com.badlogic.gdx.utils.Disposable
 import com.badlogic.gdx.utils.viewport.ScreenViewport
 import io.github.iampopovich.tunnelslide.GameConfig
+import io.github.iampopovich.tunnelslide.world.CrashReason
 import io.github.iampopovich.tunnelslide.world.RunState
 import kotlin.math.roundToInt
 
@@ -168,7 +169,7 @@ class Hud : Disposable {
         val h = viewport.worldHeight
         batch.begin()
         big.color = VALUE
-        centered(big, "CRASH", cx, h * 0.58f)
+        centered(big, if (run.crashReason == CrashReason.FELL) "FELL OFF" else "CRASH", cx, h * 0.58f)
         if (age > RESTART_DELAY) {
             label.color = LABEL
             centered(label, "TAP OR PRESS SPACE TO RESTART", cx, h * 0.44f)

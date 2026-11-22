@@ -19,6 +19,7 @@ class ObstacleField(seed: Long) {
     private val rng = RandomXS128(seed)
     private val items = ArrayDeque<Obstacle>()
     val path = SafePath()
+    val zones = ZoneTrack(seed)
     /** Pattern names in generation order, for debugging and tests. */
     val history = ArrayList<Pattern>()
 
@@ -29,6 +30,7 @@ class ObstacleField(seed: Long) {
     fun reset(seed: Long) {
         rng.setSeed(seed)
         items.clear(); history.clear(); path.clear()
+        zones.reset(seed xor 0x5EEDL)
         // Straight run-up from the start; the first route point can be anywhere,
         // there is enough distance to reach it.
         path.add(0f, 0f)
@@ -68,6 +70,8 @@ class ObstacleField(seed: Long) {
         // Breathing space between patterns shrinks with difficulty.
         val pause = MathUtils.lerp(GameConfig.PATTERN_PAUSE_EASY, GameConfig.PATTERN_PAUSE_HARD, d)
         val pauseZ = path.lastZ + pause
+        zones.ensure(pauseZ + PATTERN_MAX_LENGTH)
+        PatternBuilder.claimSeams(zones, path.lastZ, pauseZ, path.lastU)
         path.add(pauseZ, path.lastU)
 
         // Reachability must hold at the speed the player will have at the END of the pattern
@@ -75,7 +79,7 @@ class ObstacleField(seed: Long) {
         val ahead = pauseZ - playerZ + PATTERN_MAX_LENGTH
         val arrivalSpeed = minOf(GameConfig.MAX_SPEED, speed + GameConfig.ACCELERATION * ahead / speed)
         val pattern = pick(d)
-        val b = PatternBuilder(rng, path, d, arrivalSpeed)
+        val b = PatternBuilder(rng, path, d, arrivalSpeed, zones)
         pattern.build(b)
         history.add(pattern)
 

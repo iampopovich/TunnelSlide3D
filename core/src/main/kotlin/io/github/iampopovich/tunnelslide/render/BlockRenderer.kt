@@ -15,6 +15,7 @@ import io.github.iampopovich.tunnelslide.world.BlockPlacement
 import io.github.iampopovich.tunnelslide.world.Obstacle
 import io.github.iampopovich.tunnelslide.world.RunState
 import io.github.iampopovich.tunnelslide.world.TunnelSurface
+import io.github.iampopovich.tunnelslide.world.ZoneTrack
 
 /** Draws obstacles as neon-edged boxes and their warning trails. */
 class BlockRenderer : Disposable {
@@ -26,9 +27,12 @@ class BlockRenderer : Disposable {
     private val cube = buildCube()
     private val model = Matrix4()
 
-    var morph = 0f
+    private var seam = 0f
+    private lateinit var zones: ZoneTrack
 
-    fun render(camera: Camera, run: RunState, obstacles: Collection<Obstacle>) {
+    fun render(camera: Camera, run: RunState, obstacles: Collection<Obstacle>, zones: ZoneTrack) {
+        this.zones = zones
+        seam = zones.seamNear(run.playerZ, GameConfig.VIEW_DISTANCE)
         shader.bind()
         shader.setUniformMatrix("u_projView", camera.combined)
         shader.setUniformf("u_fogDist", GameConfig.VIEW_DISTANCE)
@@ -61,9 +65,10 @@ class BlockRenderer : Disposable {
     private fun draw(o: Obstacle, run: RunState, near: Float, length: Float, lift: Float, height: Float) {
         if (length <= 0f) return
         val r = GameConfig.TUNNEL_RADIUS
-        val uRel = TunnelSurface.wrapRel(o.u - run.playerU)
+        val theta = TunnelSurface.theta(o.u, run.playerU, seam)
         val width = o.halfWidth * 2f * TunnelSurface.TAU * r
-        BlockPlacement.compose(uRel, near, length, width, height, lift, morph, r, model)
+        val shape = zones.shapeAt(run.playerZ + near + length * 0.5f)
+        BlockPlacement.compose(theta, near, length, width, height, lift, shape, r, model)
 
         val c = BLOCK_COLORS[o.colorIndex % BLOCK_COLORS.size]
         shader.setUniformMatrix("u_model", model)

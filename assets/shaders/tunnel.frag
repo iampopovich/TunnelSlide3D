@@ -3,8 +3,9 @@ precision mediump float;
 #endif
 
 varying vec2 v_coord;
+varying float v_shape;
 
-uniform float u_uOffset;     // player u, reduced modulo the pattern period
+uniform float u_uOffset;     // seam position, reduced modulo the pattern period
 uniform float u_zOffset;     // player z, reduced modulo the pattern period
 uniform float u_lanes;
 uniform float u_ringLen;
@@ -33,8 +34,14 @@ void main() {
     vec3 base = mix(a, b, 0.5 + 0.5 * sin(band * 0.39));
     base *= 0.75 + 0.25 * checker;
     vec3 lineColor = vec3(0.35, 0.85, 1.0);
-
     vec3 col = mix(base, lineColor, line);
+
+    // Open surface: hot red edges along the cut, fading in with the morph.
+    float open = clamp(1.0 - abs(v_shape - 1.0) / 0.65, 0.0, 1.0);
+    float edgeDist = min(v_coord.x, 1.0 - v_coord.x) * u_lanes;   // in lanes
+    float edge = (1.0 - smoothstep(0.0, 0.35, edgeDist)) * open;
+    col = mix(col, vec3(1.0, 0.25, 0.2), edge);
+
     col = mix(col, u_fogColor, fog * fog);
     gl_FragColor = vec4(col, 1.0);
 }

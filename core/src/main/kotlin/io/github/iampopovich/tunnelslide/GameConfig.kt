@@ -45,6 +45,17 @@ object GameConfig {
     const val REACH_SAFETY = 0.55f           // share of max turn the gap may drift per row
     const val TRAIL_LENGTH = 9f              // coloured warning strip in front of a block
 
+    // Surface zones (tube / flat / outside)
+    const val ZONE_FIRST_SPECIAL = 700f      // first flat/outside episode starts around here
+    const val ZONE_TUBE_MIN = 500f
+    const val ZONE_TUBE_MAX = 1000f
+    const val ZONE_SPECIAL_MIN = 250f
+    const val ZONE_SPECIAL_MAX = 450f
+    const val ZONE_TRANSITION = 45f          // length of the morph between shapes
+    const val ZONE_CHAIN_CHANCE = 0.3f       // flat -> outside (or back) without a tube between
+    const val SETTLE_TIME = 0.18f             // straight run before a wall, seconds
+    const val EDGE_MARGIN_LANES = 4f         // route keeps this far from an open edge
+
     // Simulation
     const val FIXED_STEP = 1f / 120f
     const val MAX_FRAME_TIME = 0.25f

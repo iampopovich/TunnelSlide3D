@@ -5,6 +5,7 @@ import com.badlogic.gdx.math.RandomXS128
 import io.github.iampopovich.tunnelslide.GameConfig
 import io.github.iampopovich.tunnelslide.world.Obstacle
 import io.github.iampopovich.tunnelslide.world.TunnelSurface
+import io.github.iampopovich.tunnelslide.world.ZoneTrack
 
 /**
  * Small DSL used by patterns. A pattern first lays out the route with [go], then drops
@@ -16,7 +17,8 @@ class PatternBuilder(
     val path: SafePath,
     /** 0 = easiest, 1 = hardest. */
     val difficulty: Float,
-    speed: Float,
+    val speed: Float,
+    private val zones: ZoneTrack,
 ) {
     val blocks = ArrayList<Obstacle>()
     val startZ = path.lastZ
@@ -30,13 +32,54 @@ class PatternBuilder(
     val laneW = 1f / LANES
     var color = rng.nextInt(BLOCK_COLORS)
 
-    /** Advances the route by [dz] while drifting by [du] (clamped to what is reachable). */
+    /**
+     * Advances the route by [dz] while drifting by [du] (clamped to what is reachable).
+     * Before and on open surfaces the route also moves away from the edges - early enough
+     * and never faster than the player can turn.
+     */
     fun go(dz: Float, du: Float = 0f) {
         val limit = maxSlope * dz
+        val fromZ = z
         z += dz
-        u = TunnelSurface.wrapAbs(u + MathUtils.clamp(du, -limit, limit))
+        val margin = GameConfig.EDGE_MARGIN_LANES * laneW
+        // Distance needed to cross the whole edge band, with room to spare.
+        val warn = margin / maxSlope * 2f
+        claimSeams(zones, fromZ, z + warn, u)
+        var next = TunnelSurface.wrapAbs(u + MathUtils.clamp(du, -limit, limit))
+        if (isOpenWithin(fromZ, z + warn)) {
+            val safe = awayFromEdge(next, u, zones.seamNear(fromZ, z + warn - fromZ), margin)
+            if (safe != next) {
+                next = TunnelSurface.wrapAbs(u + MathUtils.clamp(TunnelSurface.wrapRel(safe - u), -limit, limit))
+            }
+        }
+        u = next
         path.add(z, u)
     }
+
+    private fun isOpenWithin(from: Float, to: Float): Boolean {
+        var z = from
+        while (z < to) { if (zones.isOpen(z)) return true; z += 2f }
+        return zones.isOpen(to)
+    }
+
+    /**
+     * Nearest safe position for [next]. The side of the seam is taken from the CURRENT
+     * route point [current]: deciding by [next] would let a drift that overshoots the seam
+     * pick the far side, and the route would then cross the edge on its way there.
+     */
+    private fun awayFromEdge(next: Float, current: Float, seam: Float, margin: Float): Float {
+        val side = if (TunnelSurface.wrapRel(current - seam) >= 0f) 1f else -1f
+        val rel = TunnelSurface.wrapRel(next - seam)
+        val onSide = rel * side >= 0f
+        if (onSide && kotlin.math.abs(rel) >= margin) return next
+        return TunnelSurface.wrapAbs(seam + side * margin)
+    }
+
+    /**
+     * Short straight stretch so the player can line up before a wall: steering reacts with
+     * a lag of 1 / TURN_RESPONSE, so a wall right at a bend of the route is unfair.
+     */
+    fun settle() = go(speed * GameConfig.SETTLE_TIME)
 
     /** Max drift over [dz]. */
     fun reach(dz: Float) = maxSlope * dz
@@ -62,6 +105,17 @@ class PatternBuilder(
 
     companion object {
         val LANES = GameConfig.LANES.toInt()
+
+        /** Zones the route enters in [fromZ, toZ] get their seam opposite the route. */
+        fun claimSeams(zones: ZoneTrack, fromZ: Float, toZ: Float, routeU: Float) {
+            zones.ensure(toZ)
+            for (zone in zones.all) {
+                if (zone.start > toZ) break
+                if (zone.seam == null && zone.start <= toZ && zone.end > fromZ) {
+                    zone.seam = TunnelSurface.wrapAbs(routeU + 0.5f)
+                }
+            }
+        }
         const val BLOCK_COLORS = 4
 
     }
