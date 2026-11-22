@@ -9,10 +9,9 @@ import com.badlogic.gdx.graphics.VertexAttribute
 import com.badlogic.gdx.graphics.VertexAttributes
 import com.badlogic.gdx.graphics.glutils.ShaderProgram
 import com.badlogic.gdx.math.Matrix4
-import com.badlogic.gdx.math.Vector2
-import com.badlogic.gdx.math.Vector3
 import com.badlogic.gdx.utils.Disposable
 import io.github.iampopovich.tunnelslide.GameConfig
+import io.github.iampopovich.tunnelslide.world.BlockPlacement
 import io.github.iampopovich.tunnelslide.world.Obstacle
 import io.github.iampopovich.tunnelslide.world.RunState
 import io.github.iampopovich.tunnelslide.world.TunnelSurface
@@ -26,12 +25,6 @@ class BlockRenderer : Disposable {
 
     private val cube = buildCube()
     private val model = Matrix4()
-    private val tmpP = Vector3()
-    private val tmpT = Vector2()
-    private val tmpN = Vector2()
-    private val xAxis = Vector3()
-    private val yAxis = Vector3()
-    private val zAxis = Vector3(0f, 0f, 1f)
 
     var morph = 0f
 
@@ -67,17 +60,10 @@ class BlockRenderer : Disposable {
     /** Places the unit cube on the surface: [near] is the distance of its near face. */
     private fun draw(o: Obstacle, run: RunState, near: Float, length: Float, lift: Float, height: Float) {
         if (length <= 0f) return
-        val uRel = TunnelSurface.wrapRel(o.u - run.playerU)
         val r = GameConfig.TUNNEL_RADIUS
-        TunnelSurface.point(uRel, near + length * 0.5f, morph, r, tmpP)
-        TunnelSurface.tangent(uRel, morph, tmpT)
-        TunnelSurface.normal(uRel, morph, tmpN)
-        val up = lift + height * 0.5f
-        tmpP.add(tmpN.x * up, tmpN.y * up, 0f)
-        xAxis.set(tmpT.x, tmpT.y, 0f)
-        yAxis.set(tmpN.x, tmpN.y, 0f)
+        val uRel = TunnelSurface.wrapRel(o.u - run.playerU)
         val width = o.halfWidth * 2f * TunnelSurface.TAU * r
-        model.set(xAxis, yAxis, zAxis, tmpP).scale(width, height, length)
+        BlockPlacement.compose(uRel, near, length, width, height, lift, morph, r, model)
 
         val c = BLOCK_COLORS[o.colorIndex % BLOCK_COLORS.size]
         shader.setUniformMatrix("u_model", model)

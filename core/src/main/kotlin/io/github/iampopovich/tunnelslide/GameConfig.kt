@@ -34,6 +34,7 @@ object GameConfig {
     const val FIRST_ROW_DISTANCE = 60f
     const val ROW_SPACING = 16f
     const val BLOCK_LENGTH = 2f
+    const val ROW_Z_JITTER = 4f              // blocks of one row are spread over this depth
     const val BLOCK_HEIGHT = 1.1f
     const val BLOCK_WIDTH_FILL = 0.9f        // block width as a share of the lane
     const val GAP_HALF_LANES = 1.5f          // guaranteed free half-width, in lanes

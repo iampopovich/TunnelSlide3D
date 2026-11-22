@@ -22,11 +22,14 @@ class ObstacleField(seed: Long) {
 
     val obstacles: Collection<Obstacle> get() = items
 
+    init { reset(seed) }
+
     fun reset(seed: Long) {
         rng.setSeed(seed)
         items.clear(); gaps.clear()
         nextRowZ = GameConfig.FIRST_ROW_DISTANCE
-        gapU = 0f
+        // The first row is far enough to reach any point of the tunnel, so start anywhere.
+        gapU = rng.nextFloat()
     }
 
     /** Spawns rows up to the view distance and drops the ones left behind. */
@@ -36,11 +39,12 @@ class ObstacleField(seed: Long) {
             nextRowZ += GameConfig.ROW_SPACING
         }
         while (items.isNotEmpty() && items.first().z + items.first().length < playerZ - 2f) items.removeFirst()
-        while (gaps.isNotEmpty() && gaps.first().first < playerZ - 2f) gaps.removeFirst()
+        // A gap is needed until the player has left its whole row (blocks are jittered in z).
+        while (gaps.isNotEmpty() && gaps.first().first + ROW_DEPTH < playerZ) gaps.removeFirst()
     }
 
-    /** Centre of the gap in the nearest row whose z is ahead of [z], or null. */
-    fun gapAhead(z: Float): Float? = gaps.firstOrNull { it.first + GameConfig.BLOCK_LENGTH >= z }?.second
+    /** Centre of the gap in the nearest row that is not fully behind [z], or null. */
+    fun gapAhead(z: Float): Float? = gaps.firstOrNull { it.first + ROW_DEPTH >= z }?.second
 
     /**
      * True if the player, moving from [fromZ] to [toZ] at across-position [u],
@@ -59,7 +63,9 @@ class ObstacleField(seed: Long) {
         val lanes = GameConfig.LANES.toInt()
         val laneW = 1f / lanes
         // How far (in u) the player can comfortably turn between two rows.
-        val reach = GameConfig.MAX_TURN_RATE * (GameConfig.ROW_SPACING / speed) * GameConfig.REACH_SAFETY
+        // Only the free stretch between the end of one row and the start of the next counts.
+        val freeRun = GameConfig.ROW_SPACING - ROW_DEPTH
+        val reach = GameConfig.MAX_TURN_RATE * (freeRun / speed) * GameConfig.REACH_SAFETY
         gapU = TunnelSurface.wrapAbs(gapU + (rng.nextFloat() * 2f - 1f) * reach)
         gaps.addLast(z to gapU)
 
@@ -72,11 +78,11 @@ class ObstacleField(seed: Long) {
             val laneU = (lane + 0.5f) * laneW
             if (abs(TunnelSurface.wrapRel(laneU - gapU)) < gapHalf + laneW * 0.5f) continue
             if (rng.nextFloat() > density) continue
-            items.addLast(
+            insertSorted(
                 Obstacle(
                     u = laneU,
                     halfWidth = laneW * 0.5f * GameConfig.BLOCK_WIDTH_FILL,
-                    z = z,
+                    z = z + rng.nextFloat() * GameConfig.ROW_Z_JITTER,
                     length = GameConfig.BLOCK_LENGTH,
                     height = GameConfig.BLOCK_HEIGHT,
                     colorIndex = floor(rng.nextFloat() * BLOCK_COLORS).toInt(),
@@ -85,7 +91,16 @@ class ObstacleField(seed: Long) {
         }
     }
 
+    /** Blocks inside a row are jittered in z, so keep the deque sorted for the early exit in [hits]. */
+    private fun insertSorted(o: Obstacle) {
+        var i = items.size
+        while (i > 0 && items[i - 1].z > o.z) i--
+        items.add(i, o)
+    }
+
     companion object {
         const val BLOCK_COLORS = 4
+        /** Full z extent a row can occupy. */
+        const val ROW_DEPTH = GameConfig.ROW_Z_JITTER + GameConfig.BLOCK_LENGTH
     }
 }
