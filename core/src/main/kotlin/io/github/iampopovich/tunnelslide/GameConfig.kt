@@ -42,6 +42,8 @@ object GameConfig {
     const val ROW_Z_JITTER = 4f              // blocks of one row are spread over this depth
     const val BLOCK_HEIGHT = 1.1f
     const val BLOCK_WIDTH_FILL = 0.9f        // block width as a share of the lane
+    const val PILLAR_WIDTH_FILL = 0.7f
+    const val PILLAR_LENGTH = 0.9f
     const val REACH_SAFETY = 0.55f           // share of max turn the gap may drift per row
     const val TRAIL_LENGTH = 9f              // coloured warning strip in front of a block
 
@@ -51,10 +53,15 @@ object GameConfig {
     const val ZONE_TUBE_MAX = 1000f
     const val ZONE_SPECIAL_MIN = 250f
     const val ZONE_SPECIAL_MAX = 450f
-    const val ZONE_TRANSITION = 45f          // length of the morph between shapes
+    const val ZONE_TRANSITION = 60f          // distance over which the whole surface morphs
     const val ZONE_CHAIN_CHANCE = 0.3f       // flat -> outside (or back) without a tube between
     const val SETTLE_TIME = 0.18f             // straight run before a wall, seconds
     const val EDGE_MARGIN_LANES = 4f         // route keeps this far from an open edge
+
+    // Moving obstacles
+    const val ROLLER_STEP = 0.6f             // seconds per tick: rest, then roll one lane over
+    const val ROLLER_REST = 0.55f            // share of a tick the roller stands still
+    const val ROUTE_TIME_WINDOW = 0.15f      // +- seconds checked around the player's arrival time
 
     // Simulation
     const val FIXED_STEP = 1f / 120f

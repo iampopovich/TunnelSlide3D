@@ -1,22 +1,20 @@
 // Shared surface mapping, prepended to every vertex shader that places things on the tunnel.
 // MUST stay identical to world/TunnelSurface.kt.
 
+#ifdef GL_ES
+#define MEDP mediump
+#else
+#define MEDP
+#endif
+
 uniform float u_radius;
-// Surface shape along the view: base + two ramps (start dist, length, delta).
-uniform float u_shapeBase;
-uniform vec3 u_ramp0;
-uniform vec3 u_ramp1;
+// Current surface shape: 0 tube, 1 flat, 2 outside. One value for the whole view, so the
+// tunnel opens and closes around the player in real time.
+// Also read by tunnel.frag: on GLES a uniform shared by both stages must have the same
+// precision, and fragment shaders default to mediump.
+uniform MEDP float u_shape;
 
 const float TAU = 6.2831853;
-
-float ramp(vec3 r, float dist) {
-    if (r.y <= 0.0) return 0.0;
-    return r.z * clamp((dist - r.x) / r.y, 0.0, 1.0);
-}
-
-float shapeAt(float dist) {
-    return u_shapeBase + ramp(u_ramp0, dist) + ramp(u_ramp1, dist);
-}
 
 vec2 surfacePoint(float th, float shape) {
     float s = sin(th);

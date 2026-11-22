@@ -4,6 +4,7 @@ import com.badlogic.gdx.math.MathUtils
 import com.badlogic.gdx.math.RandomXS128
 import io.github.iampopovich.tunnelslide.GameConfig
 import io.github.iampopovich.tunnelslide.world.Obstacle
+import io.github.iampopovich.tunnelslide.world.ObstacleKind
 import io.github.iampopovich.tunnelslide.world.TunnelSurface
 import io.github.iampopovich.tunnelslide.world.ZoneTrack
 
@@ -96,6 +97,32 @@ class PatternBuilder(
         blocks.add(Obstacle(lane(idx), laneW * 0.5f * GameConfig.BLOCK_WIDTH_FILL, z, length, height, color))
     }
 
+    /** Full-span pillar standing on [laneIndex] (in the tube it reaches the opposite wall). */
+    fun pillar(laneIndex: Int, z: Float, length: Float = GameConfig.PILLAR_LENGTH) {
+        val idx = ((laneIndex % LANES) + LANES) % LANES
+        blocks.add(Obstacle(lane(idx), laneW * 0.5f * GameConfig.PILLAR_WIDTH_FILL, z, length,
+            2f * GameConfig.TUNNEL_RADIUS, color, ObstacleKind.PILLAR))
+    }
+
+    /**
+     * Tick-tock roller with its home on [laneIndex]: circles the whole tunnel in [dir]
+     * when [sweepLanes] is 0, otherwise sweeps back and forth over that many lanes.
+     */
+    fun roller(laneIndex: Int, z: Float, phase: Float, dir: Int = 1, sweepLanes: Int = 0) {
+        val idx = ((laneIndex % LANES) + LANES) % LANES
+        val side = laneW * TunnelSurface.TAU * GameConfig.TUNNEL_RADIUS   // cube side in world units
+        blocks.add(Obstacle(lane(idx), laneW * 0.5f, z, side, side, color, ObstacleKind.ROLLER, phase, dir, sweepLanes))
+    }
+
+    /** Kind of surface the pattern is built on (where the route currently is). */
+    fun zoneKindHere() = zones.zoneAt(z).kind
+
+    /** Seam lane index of the open zone around the route, or null in a closed tube. */
+    fun seamLaneHere(): Int? {
+        if (zoneKindHere() != io.github.iampopovich.tunnelslide.world.ZoneKind.FLAT) return null
+        return MathUtils.round(zones.seamNear(z, 0f) * LANES) % LANES
+    }
+
     /** A full ring of blocks; the route will carve its gap. */
     fun ring(z: Float, length: Float = GameConfig.WALL_LENGTH) {
         for (l in 0 until LANES) block(l, z, length)
@@ -112,7 +139,10 @@ class PatternBuilder(
             for (zone in zones.all) {
                 if (zone.start > toZ) break
                 if (zone.seam == null && zone.start <= toZ && zone.end > fromZ) {
-                    zone.seam = TunnelSurface.wrapAbs(routeU + 0.5f)
+                    // Snap to an even lane boundary: the panel pattern is drawn relative to
+                    // the seam and repeats every 2 lanes, so the switch stays invisible.
+                    val lanes2 = LANES / 2f
+                    zone.seam = TunnelSurface.wrapAbs(MathUtils.round(TunnelSurface.wrapAbs(routeU + 0.5f) * lanes2) / lanes2)
                 }
             }
         }

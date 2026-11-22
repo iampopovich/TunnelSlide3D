@@ -10,6 +10,7 @@ import com.badlogic.gdx.graphics.VertexAttributes
 import com.badlogic.gdx.utils.Disposable
 import io.github.iampopovich.tunnelslide.GameConfig
 import io.github.iampopovich.tunnelslide.world.ObstacleField
+import io.github.iampopovich.tunnelslide.world.ObstacleKind
 import io.github.iampopovich.tunnelslide.world.RunState
 import io.github.iampopovich.tunnelslide.world.TunnelSurface
 
@@ -25,33 +26,53 @@ class BlockRenderer : Disposable {
     private val shader = Shaders.withSurface("block")
     private var blocks: Mesh? = null
     private var trails: Mesh? = null
+    private var blockCount = 0
+    private var trailCount = 0
+    private var scratch = FloatArray(0)
     private var builtVersion = -1
     private var builtSeam = Float.NaN
     private var zBase = 0f
 
+    private val threats = ArrayList<ObstacleField.Threat>()
+
     fun render(camera: Camera, run: RunState, field: ObstacleField, surface: SurfaceUniforms) {
         if (field.version != builtVersion || surface.seam != builtSeam) rebuild(field, surface.seam, run.playerZ)
+        // Warnings only for what the player is actually heading into, refreshed every frame.
+        val n = if (run.crashed) 0 else
+            field.threats(run.playerU, run.playerZ, GameConfig.VIEW_DISTANCE, surface.shape, threats)
+        trailCount = n
+        trails = upload(trails, n) { out ->
+            var i = 0
+            for (k in 0 until n) {
+                val t = threats[k]
+                i = writeCube(out, i, t.u, t.z - GameConfig.TRAIL_LENGTH, GameConfig.TRAIL_LENGTH, t.halfWidth,
+                    0.001f, TRAIL_LIFT, surface.seam, t.colorIndex, 0f, 0f, 0f, 0f)
+            }
+        }
 
         shader.bind()
         shader.setUniformMatrix("u_projView", camera.combined)
         surface.apply(shader)
         // Seam-relative position of the player, as the cube positions are stored.
         shader.setUniformf("u_zShift", zBase - run.playerZ)
+        shader.setUniformf("u_clock", run.time / GameConfig.ROLLER_STEP)
+        shader.setUniformf("u_rest", GameConfig.ROLLER_REST)
+        shader.setUniformf("u_lanes", GameConfig.LANES)
         shader.setUniformf("u_fogDist", GameConfig.VIEW_DISTANCE)
         shader.setUniformf("u_fogColor", Palette.FOG.r, Palette.FOG.g, Palette.FOG.b)
 
-        trails?.let {
+        trails?.takeIf { trailCount > 0 }?.let {
             Gdx.gl.glEnable(GL20.GL_BLEND)
             Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE)
             Gdx.gl.glDepthMask(false)
             shader.setUniformf("u_trail", 1f)
-            it.render(shader, GL20.GL_TRIANGLES)
+            it.render(shader, GL20.GL_TRIANGLES, 0, trailCount * 36)
             Gdx.gl.glDepthMask(true)
             Gdx.gl.glDisable(GL20.GL_BLEND)
         }
-        blocks?.let {
+        blocks?.takeIf { blockCount > 0 }?.let {
             shader.setUniformf("u_trail", 0f)
-            it.render(shader, GL20.GL_TRIANGLES)
+            it.render(shader, GL20.GL_TRIANGLES, 0, blockCount * 36)
         }
     }
 
@@ -60,36 +81,41 @@ class BlockRenderer : Disposable {
         builtSeam = seam
         zBase = playerZ
         val list = field.obstacles.toList()
+        blockCount = list.size
         blocks = upload(blocks, list.size) { out ->
             var i = 0
-            for (o in list) i = writeCube(out, i, o.u, o.z, o.length, o.halfWidth, o.height, 0f, seam, o.colorIndex)
-        }
-        trails = upload(trails, list.size) { out ->
-            var i = 0
             for (o in list) {
-                val start = o.z - GameConfig.TRAIL_LENGTH
-                i = writeCube(out, i, o.u, start, GameConfig.TRAIL_LENGTH, o.halfWidth, 0.001f, TRAIL_LIFT, seam, o.colorIndex)
+                val mode = when (o.kind) {
+                    ObstacleKind.BLOCK -> 0f
+                    ObstacleKind.ROLLER -> 1f
+                    ObstacleKind.PILLAR -> 2f
+                }
+                i = writeCube(out, i, o.u, o.z, o.length, o.halfWidth, o.height, 0f, seam, o.colorIndex,
+                    mode, o.phase, o.sweepLanes.toFloat(), o.dir.toFloat())
             }
         }
     }
 
+    /** Fills a mesh with [count] cubes, growing it when needed; an empty set keeps the old buffer. */
     private fun upload(old: Mesh?, count: Int, fill: (FloatArray) -> Unit): Mesh? {
-        if (count == 0) { old?.dispose(); return null }
-        val capacity = maxOf(count, MIN_CAPACITY)
-        val mesh = if (old != null && old.maxVertices >= capacity * 24) old else {
+        if (count == 0) return old
+        val mesh = if (old != null && old.maxVertices >= count * 24) old else {
             old?.dispose()
+            val capacity = maxOf(count * 2, MIN_CAPACITY)
             Mesh(
-                false, capacity * 2 * 24, capacity * 2 * 36,
+                false, capacity * 24, capacity * 36,
                 VertexAttribute(VertexAttributes.Usage.Position, 3, "a_position"),
                 VertexAttribute(VertexAttributes.Usage.Normal, 3, "a_normal"),
                 VertexAttribute(VertexAttributes.Usage.Generic, 4, "a_block"),
-                VertexAttribute(VertexAttributes.Usage.Generic, 2, "a_extra"),
+                VertexAttribute(VertexAttributes.Usage.Generic, 4, "a_extra"),
+                VertexAttribute(VertexAttributes.Usage.Generic, 2, "a_roll"),
                 VertexAttribute(VertexAttributes.Usage.ColorUnpacked, 3, "a_color"),
             )
         }
-        val verts = FloatArray(count * 24 * FLOATS)
-        fill(verts)
-        mesh.setVertices(verts)
+        val size = count * 24 * FLOATS
+        if (scratch.size < size) scratch = FloatArray(size)
+        fill(scratch)
+        mesh.setVertices(scratch, 0, size)
         mesh.setIndices(indicesFor(count))
         return mesh
     }
@@ -97,6 +123,7 @@ class BlockRenderer : Disposable {
     private fun writeCube(
         out: FloatArray, start: Int, u: Float, z: Float, length: Float, halfWidth: Float,
         height: Float, lift: Float, seam: Float, colorIndex: Int,
+        mode: Float, phase: Float, sweep: Float, dir: Float,
     ): Int {
         var i = start
         val a = TunnelSurface.wrapAbs(u - seam)
@@ -106,7 +133,8 @@ class BlockRenderer : Disposable {
         for (v in 0 until 24) {
             for (k in 0..5) out[i++] = CUBE[v * 6 + k]
             out[i++] = a; out[i++] = zRel; out[i++] = length; out[i++] = width
-            out[i++] = height; out[i++] = lift
+            out[i++] = height; out[i++] = lift; out[i++] = mode; out[i++] = phase
+            out[i++] = sweep; out[i++] = dir
             out[i++] = c.r; out[i++] = c.g; out[i++] = c.b
         }
         return i
@@ -119,8 +147,8 @@ class BlockRenderer : Disposable {
     }
 
     companion object {
-        private const val FLOATS = 3 + 3 + 4 + 2 + 3
-        private const val MIN_CAPACITY = 256
+        private const val FLOATS = 3 + 3 + 4 + 4 + 2 + 3
+        private const val MIN_CAPACITY = 32
         private const val TRAIL_LIFT = 0.045f   // above the faceted tube surface
 
         val BLOCK_COLORS = arrayOf(

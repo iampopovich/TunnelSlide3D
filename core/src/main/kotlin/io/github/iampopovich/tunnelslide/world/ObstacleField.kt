@@ -6,7 +6,6 @@ import io.github.iampopovich.tunnelslide.GameConfig
 import io.github.iampopovich.tunnelslide.world.gen.Pattern
 import io.github.iampopovich.tunnelslide.world.gen.PatternBuilder
 import io.github.iampopovich.tunnelslide.world.gen.SafePath
-import kotlin.math.abs
 
 /**
  * Keeps obstacles in front of the player and answers collision queries.
@@ -49,6 +48,9 @@ class ObstacleField(seed: Long) {
         path.trimBefore(playerZ - 5f)
     }
 
+    /** Dev override (TS_PATTERN): always generate this pattern. */
+    var forcedPattern: Pattern? = null
+
     /** Dev override (TS_DIFFICULTY): fixed difficulty instead of the distance ramp. */
     var difficultyOverride: Float? = null
 
@@ -60,13 +62,34 @@ class ObstacleField(seed: Long) {
      * True if the player, moving from [fromZ] to [toZ] at across-position [u],
      * touches any obstacle. Sweeping the z interval avoids tunnelling at high speed.
      */
-    fun hits(u: Float, fromZ: Float, toZ: Float): Boolean {
+    fun hits(u: Float, fromZ: Float, toZ: Float, time: Float = 0f, shape: Float = 0f): Boolean {
         for (o in items) {
             if (o.z > toZ + GameConfig.PLAYER_LENGTH) break   // sorted by z
             if (o.z + o.length < fromZ) continue
-            if (abs(TunnelSurface.wrapRel(o.u - u)) < o.halfWidth + GameConfig.PLAYER_HALF_WIDTH) return true
+            if (o.overlapsU(u, GameConfig.PLAYER_HALF_WIDTH, time, shape)) return true
         }
         return false
+    }
+
+    /** One warning: the dangerous spot of an obstacle the player is heading into. */
+    class Threat(var u: Float = 0f, var halfWidth: Float = 0f, var z: Float = 0f, var colorIndex: Int = 0)
+
+    /**
+     * Obstacles the player will hit if they keep [playerU], up to [ahead]. Moving obstacles
+     * are checked at the moment the player gets to them (known in advance, see Kinematics).
+     * Fills [out] (reusing its objects) and returns the count.
+     */
+    fun threats(playerU: Float, playerZ: Float, ahead: Float, shape: Float, out: ArrayList<Threat>): Int {
+        var n = 0
+        for (o in items) {
+            if (o.z > playerZ + ahead) break
+            if (o.z + o.length < playerZ) continue
+            val at = o.threatAt(playerU, GameConfig.PLAYER_HALF_WIDTH, Kinematics.timeAt(o.z), shape) ?: continue
+            if (n == out.size) out.add(Threat())
+            out[n].apply { u = at; halfWidth = o.halfWidth; z = o.z; colorIndex = o.colorIndex }
+            n++
+        }
+        return n
     }
 
     private fun spawnPattern(playerZ: Float, speed: Float) {
@@ -96,6 +119,7 @@ class ObstacleField(seed: Long) {
     }
 
     private fun pick(d: Float): Pattern {
+        forcedPattern?.let { return it }
         val options = Pattern.entries
         val total = options.sumOf { it.weight(d).toDouble() }.toFloat()
         var r = rng.nextFloat() * total
@@ -111,7 +135,18 @@ class ObstacleField(seed: Long) {
         var z = o.z - GameConfig.PLAYER_LENGTH - ROUTE_LOOK
         val end = o.z + o.length + ROUTE_LOOK
         while (z <= end) {
-            if (abs(TunnelSurface.wrapRel(o.u - path.uAt(z))) < o.halfWidth + margin) return false
+            val pu = path.uAt(z)
+            if (o.kind == ObstacleKind.ROLLER) {
+                // Moving: check where it is when the player actually gets here, with a window.
+                val t = Kinematics.timeAt(z)
+                var dt = -GameConfig.ROUTE_TIME_WINDOW
+                while (dt <= GameConfig.ROUTE_TIME_WINDOW) {
+                    if (o.overlapsU(pu, margin, t + dt, 0f)) return false
+                    dt += ROUTE_TIME_SAMPLE
+                }
+            } else if (o.mayCoverU(pu, margin)) {
+                return false
+            }
             z += ROUTE_SAMPLE
         }
         return true
@@ -127,6 +162,7 @@ class ObstacleField(seed: Long) {
     companion object {
         const val BLOCK_COLORS = PatternBuilder.BLOCK_COLORS
         private const val ROUTE_SAMPLE = 0.25f
+        private const val ROUTE_TIME_SAMPLE = 0.03f
         private const val PATTERN_MAX_LENGTH = 120f
         /** Extra z checked before/after a block: covers the turn lag of a real player. */
         private const val ROUTE_LOOK = 0.75f
