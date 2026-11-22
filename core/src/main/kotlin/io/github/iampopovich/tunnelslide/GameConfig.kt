@@ -30,18 +30,19 @@ object GameConfig {
     const val PLAYER_HALF_WIDTH = 0.006f     // in u (~0.15 world units)
     const val PLAYER_LENGTH = 0.3f
 
-    // Obstacles (batch-3 row generator)
+    // Obstacles and generator
     const val FIRST_ROW_DISTANCE = 60f
-    const val ROW_SPACING = 16f
+    const val WALL_LENGTH = 1.5f
+    const val PATTERN_PAUSE_EASY = 30f       // empty stretch between patterns
+    const val PATTERN_PAUSE_HARD = 10f
+    const val ROUTE_MARGIN_EASY = 1.2f       // free space around the route, in lanes
+    const val ROUTE_MARGIN_HARD = 0.35f
+    const val DIFFICULTY_RAMP_DISTANCE = 6000f  // distance at which difficulty reaches 1
     const val BLOCK_LENGTH = 2f
     const val ROW_Z_JITTER = 4f              // blocks of one row are spread over this depth
     const val BLOCK_HEIGHT = 1.1f
     const val BLOCK_WIDTH_FILL = 0.9f        // block width as a share of the lane
-    const val GAP_HALF_LANES = 1.5f          // guaranteed free half-width, in lanes
     const val REACH_SAFETY = 0.55f           // share of max turn the gap may drift per row
-    const val BASE_DENSITY = 0.30f
-    const val DENSITY_PER_SPEED = 0.008f
-    const val MAX_DENSITY = 0.75f
     const val TRAIL_LENGTH = 9f              // coloured warning strip in front of a block
 
     // Simulation

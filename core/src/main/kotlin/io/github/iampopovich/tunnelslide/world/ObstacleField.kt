@@ -3,22 +3,24 @@ package io.github.iampopovich.tunnelslide.world
 import com.badlogic.gdx.math.MathUtils
 import com.badlogic.gdx.math.RandomXS128
 import io.github.iampopovich.tunnelslide.GameConfig
+import io.github.iampopovich.tunnelslide.world.gen.Pattern
+import io.github.iampopovich.tunnelslide.world.gen.PatternBuilder
+import io.github.iampopovich.tunnelslide.world.gen.SafePath
 import kotlin.math.abs
-import kotlin.math.floor
 
 /**
  * Keeps obstacles in front of the player and answers collision queries.
  *
- * Batch-3 generator: rows of lane-aligned blocks with one guaranteed gap. The gap centre
- * does a random walk limited by how far the player can turn before the next row, so every
- * row is reachable from the previous one. Proper patterns come in batch 4.
+ * Generation: patterns are chained one after another along a [SafePath]. After a pattern
+ * is built, every block that touches the route (plus a difficulty-dependent margin) is
+ * removed, so the run is always passable no matter how dense the pattern is.
  */
 class ObstacleField(seed: Long) {
     private val rng = RandomXS128(seed)
     private val items = ArrayDeque<Obstacle>()
-    private val gaps = ArrayDeque<Pair<Float, Float>>()   // (row z, gap centre u)
-    private var nextRowZ = GameConfig.FIRST_ROW_DISTANCE
-    private var gapU = 0f
+    val path = SafePath()
+    /** Pattern names in generation order, for debugging and tests. */
+    val history = ArrayList<Pattern>()
 
     val obstacles: Collection<Obstacle> get() = items
 
@@ -26,25 +28,27 @@ class ObstacleField(seed: Long) {
 
     fun reset(seed: Long) {
         rng.setSeed(seed)
-        items.clear(); gaps.clear()
-        nextRowZ = GameConfig.FIRST_ROW_DISTANCE
-        // The first row is far enough to reach any point of the tunnel, so start anywhere.
-        gapU = rng.nextFloat()
+        items.clear(); history.clear(); path.clear()
+        // Straight run-up from the start; the first route point can be anywhere,
+        // there is enough distance to reach it.
+        path.add(0f, 0f)
+        path.add(GameConfig.FIRST_ROW_DISTANCE * 0.5f, 0f)
+        path.add(GameConfig.FIRST_ROW_DISTANCE, rng.nextFloat() * 0.3f - 0.15f)
     }
 
-    /** Spawns rows up to the view distance and drops the ones left behind. */
+    /** Spawns patterns up to the view distance and drops what is left behind. */
     fun update(playerZ: Float, speed: Float) {
-        while (nextRowZ < playerZ + GameConfig.VIEW_DISTANCE) {
-            spawnRow(nextRowZ, speed)
-            nextRowZ += GameConfig.ROW_SPACING
-        }
+        while (path.lastZ < playerZ + GameConfig.VIEW_DISTANCE + 20f) spawnPattern(playerZ, speed)
         while (items.isNotEmpty() && items.first().z + items.first().length < playerZ - 2f) items.removeFirst()
-        // A gap is needed until the player has left its whole row (blocks are jittered in z).
-        while (gaps.isNotEmpty() && gaps.first().first + ROW_DEPTH < playerZ) gaps.removeFirst()
+        path.trimBefore(playerZ - 5f)
     }
 
-    /** Centre of the gap in the nearest row that is not fully behind [z], or null. */
-    fun gapAhead(z: Float): Float? = gaps.firstOrNull { it.first + ROW_DEPTH >= z }?.second
+    /** Dev override (TS_DIFFICULTY): fixed difficulty instead of the distance ramp. */
+    var difficultyOverride: Float? = null
+
+    /** Difficulty 0..1 as a function of distance travelled. */
+    fun difficultyAt(z: Float): Float =
+        difficultyOverride ?: MathUtils.clamp(z / GameConfig.DIFFICULTY_RAMP_DISTANCE, 0f, 1f)
 
     /**
      * True if the player, moving from [fromZ] to [toZ] at across-position [u],
@@ -59,39 +63,52 @@ class ObstacleField(seed: Long) {
         return false
     }
 
-    private fun spawnRow(z: Float, speed: Float) {
-        val lanes = GameConfig.LANES.toInt()
-        val laneW = 1f / lanes
-        // How far (in u) the player can comfortably turn between two rows.
-        // Only the free stretch between the end of one row and the start of the next counts.
-        val freeRun = GameConfig.ROW_SPACING - ROW_DEPTH
-        val reach = GameConfig.MAX_TURN_RATE * (freeRun / speed) * GameConfig.REACH_SAFETY
-        gapU = TunnelSurface.wrapAbs(gapU + (rng.nextFloat() * 2f - 1f) * reach)
-        gaps.addLast(z to gapU)
+    private fun spawnPattern(playerZ: Float, speed: Float) {
+        val d = difficultyAt(path.lastZ)
+        // Breathing space between patterns shrinks with difficulty.
+        val pause = MathUtils.lerp(GameConfig.PATTERN_PAUSE_EASY, GameConfig.PATTERN_PAUSE_HARD, d)
+        val pauseZ = path.lastZ + pause
+        path.add(pauseZ, path.lastU)
 
-        val density = MathUtils.clamp(
-            GameConfig.BASE_DENSITY + (speed - GameConfig.START_SPEED) * GameConfig.DENSITY_PER_SPEED,
-            0f, GameConfig.MAX_DENSITY,
-        )
-        val gapHalf = GameConfig.GAP_HALF_LANES * laneW
-        for (lane in 0 until lanes) {
-            val laneU = (lane + 0.5f) * laneW
-            if (abs(TunnelSurface.wrapRel(laneU - gapU)) < gapHalf + laneW * 0.5f) continue
-            if (rng.nextFloat() > density) continue
-            insertSorted(
-                Obstacle(
-                    u = laneU,
-                    halfWidth = laneW * 0.5f * GameConfig.BLOCK_WIDTH_FILL,
-                    z = z + rng.nextFloat() * GameConfig.ROW_Z_JITTER,
-                    length = GameConfig.BLOCK_LENGTH,
-                    height = GameConfig.BLOCK_HEIGHT,
-                    colorIndex = floor(rng.nextFloat() * BLOCK_COLORS).toInt(),
-                ),
-            )
-        }
+        // Reachability must hold at the speed the player will have at the END of the pattern
+        // (speed only grows), so estimate it with some room for long patterns.
+        val ahead = pauseZ - playerZ + PATTERN_MAX_LENGTH
+        val arrivalSpeed = minOf(GameConfig.MAX_SPEED, speed + GameConfig.ACCELERATION * ahead / speed)
+        val pattern = pick(d)
+        val b = PatternBuilder(rng, path, d, arrivalSpeed)
+        pattern.build(b)
+        history.add(pattern)
+
+        val margin = GameConfig.PLAYER_HALF_WIDTH +
+            b.laneW * MathUtils.lerp(GameConfig.ROUTE_MARGIN_EASY, GameConfig.ROUTE_MARGIN_HARD, d)
+        b.blocks.filter { isClearOfRoute(it, margin) }
+            .sortedBy { it.z }
+            .forEach { insertSorted(it) }
     }
 
-    /** Blocks inside a row are jittered in z, so keep the deque sorted for the early exit in [hits]. */
+    private fun pick(d: Float): Pattern {
+        val options = Pattern.entries
+        val total = options.sumOf { it.weight(d).toDouble() }.toFloat()
+        var r = rng.nextFloat() * total
+        for (p in options) {
+            r -= p.weight(d)
+            if (r <= 0f) return p
+        }
+        return Pattern.SCATTER
+    }
+
+    /** Samples the route along the block's length (plus the player's own length). */
+    private fun isClearOfRoute(o: Obstacle, margin: Float): Boolean {
+        var z = o.z - GameConfig.PLAYER_LENGTH - ROUTE_LOOK
+        val end = o.z + o.length + ROUTE_LOOK
+        while (z <= end) {
+            if (abs(TunnelSurface.wrapRel(o.u - path.uAt(z))) < o.halfWidth + margin) return false
+            z += ROUTE_SAMPLE
+        }
+        return true
+    }
+
+    /** Patterns may overlap in z only at their joints; keep the deque sorted for [hits]. */
     private fun insertSorted(o: Obstacle) {
         var i = items.size
         while (i > 0 && items[i - 1].z > o.z) i--
@@ -99,8 +116,10 @@ class ObstacleField(seed: Long) {
     }
 
     companion object {
-        const val BLOCK_COLORS = 4
-        /** Full z extent a row can occupy. */
-        const val ROW_DEPTH = GameConfig.ROW_Z_JITTER + GameConfig.BLOCK_LENGTH
+        const val BLOCK_COLORS = PatternBuilder.BLOCK_COLORS
+        private const val ROUTE_SAMPLE = 0.25f
+        private const val PATTERN_MAX_LENGTH = 120f
+        /** Extra z checked before/after a block: covers the turn lag of a real player. */
+        private const val ROUTE_LOOK = 0.75f
     }
 }

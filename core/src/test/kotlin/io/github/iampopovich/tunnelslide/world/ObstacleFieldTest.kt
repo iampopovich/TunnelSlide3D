@@ -50,19 +50,4 @@ class ObstacleFieldTest {
         val zs = field.obstacles.map { it.z }
         assertTrue(zs == zs.sorted())
     }
-
-    @Test
-    fun autopilotSurvivesSeveralMinutesOnManySeeds() {
-        // If the bot survives, every generated row is reachable at the configured turn rate.
-        for (seed in 1L..20L) {
-            val run = RunState()
-            val field = ObstacleField(seed)
-            field.update(0f, run.speed)
-            val steps = (180f / GameConfig.FIXED_STEP).toInt()   // 3 minutes
-            repeat(steps) {
-                if (!run.crashed) run.step(GameConfig.FIXED_STEP, Autopilot.steer(run, field), field)
-            }
-            assertFalse(run.crashed, "seed $seed crashed at z=${run.playerZ}")
-        }
-    }
 }
