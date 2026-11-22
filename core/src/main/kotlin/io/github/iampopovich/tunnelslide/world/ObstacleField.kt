@@ -19,6 +19,7 @@ class ObstacleField(seed: Long) {
     private val items = ArrayDeque<Obstacle>()
     val path = SafePath()
     val zones = ZoneTrack(seed)
+    val hazards = HazardTrack(seed, ::difficultyAt)
     /** Pattern names in generation order, for debugging and tests. */
     val history = ArrayList<Pattern>()
 
@@ -37,6 +38,7 @@ class ObstacleField(seed: Long) {
         items.clear(); history.clear(); path.clear(); pickupList.clear()
         version++
         zones.reset(seed xor 0x5EEDL)
+        hazards.reset(seed xor 0x4A2AL)
         // Straight run-up from the start; the first route point can be anywhere,
         // there is enough distance to reach it.
         path.add(0f, 0f)
@@ -146,6 +148,7 @@ class ObstacleField(seed: Long) {
         b.blocks.filter { isClearOfRoute(it, margin) }
             .sortedBy { it.z }
             .forEach { insertSorted(it) }
+        placeVortices(pauseZ, b.z)
         version++
     }
 
@@ -163,6 +166,21 @@ class ObstacleField(seed: Long) {
         }
         // The route is straight inside the pause, so its u here is exact.
         pickupList.addLast(Pickup(path.lastU, z, kind))
+    }
+
+    /** Plasma clouds scatter vortices anywhere (they are not lethal, the route ignores them). */
+    private fun placeVortices(fromZ: Float, toZ: Float) {
+        val h = hazards.overlapping(fromZ, toZ) ?: return
+        if (h.kind != HazardKind.PLASMA) return
+        val list = (0 until GameConfig.VORTICES_PER_PATTERN).map {
+            val z = MathUtils.lerp(maxOf(fromZ, h.start), minOf(toZ, h.end), rng.nextFloat())
+            Pickup(rng.nextFloat(), z, BonusKind.VORTEX)
+        }.sortedBy { it.z }
+        for (v in list) {
+            var i = pickupList.size
+            while (i > 0 && pickupList[i - 1].z > v.z) i--
+            pickupList.add(i, v)
+        }
     }
 
     private fun pick(d: Float): Pattern {

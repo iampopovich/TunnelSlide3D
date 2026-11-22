@@ -18,6 +18,7 @@ import io.github.iampopovich.tunnelslide.render.Palette
 import io.github.iampopovich.tunnelslide.render.SurfaceUniforms
 import io.github.iampopovich.tunnelslide.render.TunnelRenderer
 import io.github.iampopovich.tunnelslide.world.Autopilot
+import io.github.iampopovich.tunnelslide.world.HazardKind
 import io.github.iampopovich.tunnelslide.world.ObstacleField
 import io.github.iampopovich.tunnelslide.world.RunState
 import io.github.iampopovich.tunnelslide.world.ZoneKind
@@ -59,6 +60,9 @@ class TunnelSlideGame(private val debug: DebugOptions = DebugOptions.NONE) : App
         field.difficultyOverride = debug["TS_DIFFICULTY"]?.toFloatOrNull()
         field.forcedPattern = debug["TS_PATTERN"]?.let { name ->
             Pattern.entries.firstOrNull { it.name.equals(name, ignoreCase = true) }
+        }
+        field.hazards.forcedFirst = debug["TS_HAZARD"]?.let { name ->
+            HazardKind.entries.firstOrNull { it.name.equals(name, ignoreCase = true) }
         }
         field.zones.forcedFirst = debug["TS_ZONE"]?.let { name ->
             ZoneKind.entries.firstOrNull { it.name.equals(name, ignoreCase = true) }
@@ -111,13 +115,16 @@ class TunnelSlideGame(private val debug: DebugOptions = DebugOptions.NONE) : App
         }
         fx.update(frame)
 
-        updateCamera()
-        Gdx.gl.glClearColor(Palette.FOG.r, Palette.FOG.g, Palette.FOG.b, 1f)
-        Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT or GL20.GL_DEPTH_BUFFER_BIT)
         surface.update(run, field.zones)
+        surface.updateHazards(run, field.hazards)
+        updateCamera()
+        // In a blackout the background (fog) turns light as well.
+        val bg = MathUtils.lerp(Palette.FOG.r, 0.85f, surface.invertTunnel)
+        Gdx.gl.glClearColor(bg, MathUtils.lerp(Palette.FOG.g, 0.85f, surface.invertTunnel), MathUtils.lerp(Palette.FOG.b, 0.85f, surface.invertTunnel), 1f)
+        Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT or GL20.GL_DEPTH_BUFFER_BIT)
         tunnel.render(camera, run, surface)
         blocks.render(camera, run, field, surface)
-        hud.render(run, best, crashAge, fx)
+        hud.render(run, best, crashAge, fx, field.hazards)
         capture?.onFrameRendered()
     }
 
@@ -154,7 +161,7 @@ class TunnelSlideGame(private val debug: DebugOptions = DebugOptions.NONE) : App
         camera.direction.set(0f, -0.06f, -1f).nor()
         camera.up.set(0f, 1f, 0f)
         // Roll slightly into the turn: makes steering readable even in a symmetric tube.
-        val roll = run.turnRate / GameConfig.MAX_TURN_RATE * GameConfig.ROLL_PER_TURN
+        val roll = run.turnRate / GameConfig.MAX_TURN_RATE * GameConfig.ROLL_PER_TURN + surface.hazardRoll
         camera.rotate(camera.direction, roll)
         camera.update()
     }

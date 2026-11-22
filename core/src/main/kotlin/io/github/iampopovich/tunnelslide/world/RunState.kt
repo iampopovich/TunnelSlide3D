@@ -7,7 +7,7 @@ import kotlin.math.exp
 
 enum class CrashReason { HIT, FELL }
 
-enum class RunEvent { PICKUP, SHIELD_HIT, QUAKE, SLOWMO, FOLD }
+enum class RunEvent { PICKUP, SHIELD_HIT, QUAKE, SLOWMO, FOLD, VORTEX }
 
 /** State of one run. Pure logic, no rendering, so it can be unit tested. */
 class RunState {
@@ -69,10 +69,13 @@ class RunState {
                 event = RunEvent.SLOWMO
             }
             BonusKind.FOLD -> {
-                if (!field.zones.fold(playerZ)) return false
+                // Ends whatever is in the way: an open surface and/or a hazard zone.
+                val folded = field.zones.fold(playerZ)
+                val ended = field.hazards.end(playerZ)
+                if (!folded && !ended) return false
                 event = RunEvent.FOLD
             }
-            BonusKind.SHIELD -> return false   // never stored in the slot
+            BonusKind.SHIELD, BonusKind.VORTEX -> return false   // never stored in the slot
         }
         slot = null
         return true
@@ -84,7 +87,9 @@ class RunState {
         steps++
         dtSum += dt
         if (slowLeft > 0f) slowLeft = maxOf(0f, slowLeft - dt)
-        val target = MathUtils.clamp(steer, -1f, 1f) * GameConfig.MAX_TURN_RATE
+        // A gravity well adds a constant sideways pull on top of the player's steering.
+        val pull = field?.hazards?.pullAt(playerZ) ?: 0f
+        val target = MathUtils.clamp(steer, -1f, 1f) * GameConfig.MAX_TURN_RATE + pull
         val k = 1f - exp(-GameConfig.TURN_RESPONSE * dt)
         turnRate += (target - turnRate) * k
         val oldU = playerU
@@ -115,8 +120,11 @@ class RunState {
 
     private fun collect(p: Pickup) {
         p.taken = true
-        if (p.kind == BonusKind.SHIELD) shields = minOf(GameConfig.MAX_SHIELDS, shields + 1)
-        else slot = p.kind   // one slot: a new bonus replaces the old one
+        when (p.kind) {
+            BonusKind.SHIELD -> shields = minOf(GameConfig.MAX_SHIELDS, shields + 1)
+            BonusKind.VORTEX -> { shields = 0; slot = null; event = RunEvent.VORTEX; return }
+            else -> slot = p.kind   // one slot: a new bonus replaces the old one
+        }
         event = RunEvent.PICKUP
     }
 }

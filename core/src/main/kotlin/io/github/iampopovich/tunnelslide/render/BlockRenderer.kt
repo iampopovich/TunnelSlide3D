@@ -9,6 +9,7 @@ import com.badlogic.gdx.graphics.VertexAttribute
 import com.badlogic.gdx.graphics.VertexAttributes
 import com.badlogic.gdx.utils.Disposable
 import io.github.iampopovich.tunnelslide.GameConfig
+import io.github.iampopovich.tunnelslide.world.BonusKind
 import io.github.iampopovich.tunnelslide.world.ObstacleField
 import io.github.iampopovich.tunnelslide.world.ObstacleKind
 import io.github.iampopovich.tunnelslide.world.RunState
@@ -48,8 +49,14 @@ class BlockRenderer : Disposable {
         pads = upload(pads, visible.size) { out ->
             var i = 0
             for (p in visible) {
-                i = writeCube(out, i, p.u, p.z, GameConfig.PICKUP_LENGTH, GameConfig.PICKUP_HALF_WIDTH * 0.9f,
-                    0.06f, 0.03f, surface.seam, 0, 0f, 0f, 0f, 0f, p.kind.color)
+                if (p.kind == BonusKind.VORTEX) {
+                    // Plasma vortex: a floating cube, easy to spot (a spinning look comes with batch 10).
+                    i = writeCube(out, i, p.u, p.z, 0.9f, GameConfig.PICKUP_HALF_WIDTH * 0.8f,
+                        0.9f, 0.35f, surface.seam, 0, 0f, 0f, 0f, 0f, p.kind.color)
+                } else {
+                    i = writeCube(out, i, p.u, p.z, GameConfig.PICKUP_LENGTH, GameConfig.PICKUP_HALF_WIDTH * 0.9f,
+                        0.06f, 0.03f, surface.seam, 0, 0f, 0f, 0f, 0f, p.kind.color)
+                }
             }
         }
         trailCount = n
@@ -70,7 +77,6 @@ class BlockRenderer : Disposable {
         shader.setUniformf("u_clock", run.time / GameConfig.ROLLER_STEP)
         shader.setUniformf("u_rest", GameConfig.ROLLER_REST)
         shader.setUniformf("u_lanes", GameConfig.LANES)
-        shader.setUniformf("u_fogDist", GameConfig.VIEW_DISTANCE)
         shader.setUniformf("u_fogColor", Palette.FOG.r, Palette.FOG.g, Palette.FOG.b)
 
         trails?.takeIf { trailCount > 0 }?.let {
