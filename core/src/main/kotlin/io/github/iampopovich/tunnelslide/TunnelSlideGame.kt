@@ -8,6 +8,8 @@ import com.badlogic.gdx.graphics.GL20
 import com.badlogic.gdx.graphics.PerspectiveCamera
 import com.badlogic.gdx.math.MathUtils
 import com.badlogic.gdx.utils.TimeUtils
+import io.github.iampopovich.tunnelslide.audio.AudioEngine
+import io.github.iampopovich.tunnelslide.audio.Sfx
 import io.github.iampopovich.tunnelslide.debug.DebugCapture
 import io.github.iampopovich.tunnelslide.debug.DebugOptions
 import io.github.iampopovich.tunnelslide.input.SteeringInput
@@ -20,6 +22,7 @@ import io.github.iampopovich.tunnelslide.render.TunnelRenderer
 import io.github.iampopovich.tunnelslide.world.Autopilot
 import io.github.iampopovich.tunnelslide.world.HazardKind
 import io.github.iampopovich.tunnelslide.world.ObstacleField
+import io.github.iampopovich.tunnelslide.world.RunEvent
 import io.github.iampopovich.tunnelslide.world.RunState
 import io.github.iampopovich.tunnelslide.world.ZoneKind
 import io.github.iampopovich.tunnelslide.world.gen.Pattern
@@ -36,6 +39,8 @@ class TunnelSlideGame(private val debug: DebugOptions = DebugOptions.NONE) : App
     private lateinit var prefs: Preferences
     private val run = RunState()
     private val fx = Effects()
+    private val audio = AudioEngine()
+    private var soundOn = true
     private val surface = SurfaceUniforms()
     private val field = ObstacleField(seed = 1L)
     private var accumulator = 0f
@@ -54,6 +59,8 @@ class TunnelSlideGame(private val debug: DebugOptions = DebugOptions.NONE) : App
         prefs = Gdx.app.getPreferences("tunnelslide3d")
         best = prefs.getInteger(PREF_BEST, 0)
         surface.mono = debug.has("TS_MONO") || prefs.getBoolean(PREF_MONO, false)
+        soundOn = !debug.has("TS_NOAUDIO") && prefs.getBoolean(PREF_SOUND, true)
+        if (soundOn) audio.start()
         if (debug.has("TS_AUTOPILOT")) {
             steering.autopilot = { _ -> Autopilot.steer(run, field) }
         }
@@ -92,6 +99,12 @@ class TunnelSlideGame(private val debug: DebugOptions = DebugOptions.NONE) : App
             surface.mono = !surface.mono
             prefs.putBoolean(PREF_MONO, surface.mono).flush()
         }
+        if (Gdx.input.isKeyJustPressed(Input.Keys.N)) {
+            // Sound toggle; goes into the settings menu in the menu batch.
+            soundOn = !soundOn
+            prefs.putBoolean(PREF_SOUND, soundOn).flush()
+            if (soundOn) audio.start() else audio.stop()
+        }
         if (run.crashed) {
             crashAge += frame
             val wantsRestart = Gdx.input.justTouched() || Gdx.input.isKeyJustPressed(Input.Keys.SPACE)
@@ -111,9 +124,12 @@ class TunnelSlideGame(private val debug: DebugOptions = DebugOptions.NONE) : App
                 accumulator -= GameConfig.FIXED_STEP
             }
             if (run.crashed) onCrash()
-            run.event?.let { fx.trigger(it); run.event = null }
+            run.event?.let { fx.trigger(it); audio.synth.play(sfxFor(it)); run.event = null }
         }
         fx.update(frame)
+        audio.synth.speed = run.speed
+        audio.synth.timeScale = run.timeScale
+        audio.synth.musicOn = !run.crashed
 
         surface.update(run, field.zones)
         surface.updateHazards(run, field.hazards)
@@ -141,8 +157,22 @@ class TunnelSlideGame(private val debug: DebugOptions = DebugOptions.NONE) : App
             steering.screenRightAccel(), steer, Gdx.graphics.framesPerSecond))
     }
 
+    private fun sfxFor(e: RunEvent) = when (e) {
+        RunEvent.PICKUP -> Sfx.PICKUP
+        RunEvent.SHIELD_HIT -> Sfx.SHIELD
+        RunEvent.QUAKE -> Sfx.QUAKE
+        RunEvent.SLOWMO -> Sfx.SLOWMO
+        RunEvent.FOLD -> Sfx.FOLD
+        RunEvent.VORTEX -> Sfx.VORTEX
+    }
+
+    override fun pause() { audio.stop() }
+
+    override fun resume() { if (soundOn) audio.start() }
+
     private fun onCrash() {
         crashAge = 0f
+        audio.synth.play(Sfx.CRASH)
         Gdx.input.vibrate(120)
         fx.reset()
         if (run.score > best) {
@@ -167,6 +197,7 @@ class TunnelSlideGame(private val debug: DebugOptions = DebugOptions.NONE) : App
     }
 
     override fun dispose() {
+        audio.stop()
         tunnel.dispose()
         blocks.dispose()
         hud.dispose()
@@ -176,5 +207,6 @@ class TunnelSlideGame(private val debug: DebugOptions = DebugOptions.NONE) : App
         const val TAG = "TunnelSlide3D"
         private const val PREF_BEST = "best"
         private const val PREF_MONO = "mono"
+        private const val PREF_SOUND = "sound"
     }
 }
