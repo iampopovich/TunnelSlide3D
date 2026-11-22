@@ -16,17 +16,17 @@ object BlockPlacement {
     private val n = Vector2()
 
     /**
-     * @param uRel   centre across the tunnel, relative to the player
+     * @param theta  angle of the block centre relative to the player (see [TunnelSurface.theta])
      * @param near   distance of the block's near face from the player
      * @param lift   gap between the surface and the block's bottom face
      */
     fun compose(
-        uRel: Float, near: Float, length: Float, width: Float, height: Float, lift: Float,
-        morph: Float, radius: Float, out: Matrix4,
+        theta: Float, near: Float, length: Float, width: Float, height: Float, lift: Float,
+        shape: Float, radius: Float, out: Matrix4,
     ): Matrix4 {
-        TunnelSurface.point(uRel, near + length * 0.5f, morph, radius, p)
-        TunnelSurface.tangent(uRel, morph, t)
-        TunnelSurface.normal(uRel, morph, n)
+        TunnelSurface.point(theta, near + length * 0.5f, shape, radius, p)
+        TunnelSurface.tangent(theta, shape, t)
+        TunnelSurface.normal(theta, shape, n)
         val up = lift + height * 0.5f
         p.add(n.x * up, n.y * up, 0f)
 

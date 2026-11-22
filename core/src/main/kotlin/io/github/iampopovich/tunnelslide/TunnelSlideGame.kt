@@ -17,6 +17,7 @@ import io.github.iampopovich.tunnelslide.render.TunnelRenderer
 import io.github.iampopovich.tunnelslide.world.Autopilot
 import io.github.iampopovich.tunnelslide.world.ObstacleField
 import io.github.iampopovich.tunnelslide.world.RunState
+import io.github.iampopovich.tunnelslide.world.ZoneKind
 
 /** Entry point shared by all platforms. */
 class TunnelSlideGame : ApplicationAdapter() {
@@ -49,6 +50,9 @@ class TunnelSlideGame : ApplicationAdapter() {
             steering.autopilot = { _ -> Autopilot.steer(run, field) }
         }
         field.difficultyOverride = System.getenv("TS_DIFFICULTY")?.toFloatOrNull()
+        field.zones.forcedFirst = System.getenv("TS_ZONE")?.let { name ->
+            ZoneKind.entries.firstOrNull { it.name.equals(name, ignoreCase = true) }
+        }
         newRun()
     }
 
@@ -85,8 +89,8 @@ class TunnelSlideGame : ApplicationAdapter() {
         updateCamera()
         Gdx.gl.glClearColor(Palette.FOG.r, Palette.FOG.g, Palette.FOG.b, 1f)
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT or GL20.GL_DEPTH_BUFFER_BIT)
-        tunnel.render(camera, run)
-        blocks.render(camera, run, field.obstacles)
+        tunnel.render(camera, run, field.zones)
+        blocks.render(camera, run, field.obstacles, field.zones)
         hud.render(run, best, crashAge)
         capture?.onFrameRendered()
     }

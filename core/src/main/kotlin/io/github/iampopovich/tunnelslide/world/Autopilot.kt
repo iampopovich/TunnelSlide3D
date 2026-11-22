@@ -1,19 +1,20 @@
 package io.github.iampopovich.tunnelslide.world
 
 import com.badlogic.gdx.math.MathUtils
-import io.github.iampopovich.tunnelslide.GameConfig
 
-/** Dev/test bot: follows the generator's safe route. Proves every run is passable. */
+/**
+ * Dev/test bot: pure pursuit of the generator's safe route. Proves every run is passable.
+ *
+ * It aims at the route point [LEAD_S] seconds ahead with a proportional gain. On a straight
+ * slope this leaves no steady offset when LEAD_S = 1 / (GAIN * MAX_TURN_RATE); a separate
+ * slope feed-forward was tried and failed on zigzags shorter than its look-ahead.
+ */
 object Autopilot {
     fun steer(run: RunState, field: ObstacleField): Float {
-        // Position error is measured where the player is now; the route slope is taken a bit
-        // ahead to compensate the turn-rate lag (1 / TURN_RESPONSE). Looking ahead for the
-        // position as well would double-count and leave the bot permanently off the route.
-        val err = TunnelSurface.wrapRel(field.path.uAt(run.playerZ) - run.playerU)
-        val lookZ = run.playerZ + run.speed / GameConfig.TURN_RESPONSE
-        val ff = field.path.slopeAt(lookZ) * run.speed / GameConfig.MAX_TURN_RATE
-        return MathUtils.clamp(err * GAIN + ff, -1f, 1f)
+        val target = field.path.uAt(run.playerZ + run.speed * LEAD_S)
+        return MathUtils.clamp(TunnelSurface.wrapRel(target - run.playerU) * GAIN, -1f, 1f)
     }
 
     private const val GAIN = 45f
+    private const val LEAD_S = 0.04f
 }

@@ -53,6 +53,7 @@ enum class Pattern(
             val approach = MathUtils.lerp(26f, 15f, b.difficulty)
             repeat(walls) {
                 b.go(approach, b.randomDrift(approach, MathUtils.lerp(0.6f, 1f, b.difficulty)))
+                b.settle()
                 b.ring(b.z)
                 b.go(GameConfig.WALL_LENGTH + 0.5f)
             }
@@ -67,6 +68,7 @@ enum class Pattern(
             var side = if (b.chance(0.5f)) 1f else -1f
             repeat(gates) {
                 b.go(spacing, side * b.reach(spacing) * 0.9f)
+                b.settle()
                 b.ring(b.z)
                 b.go(GameConfig.WALL_LENGTH + 0.5f)
                 side = -side

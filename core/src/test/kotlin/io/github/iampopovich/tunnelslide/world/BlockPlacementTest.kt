@@ -11,19 +11,19 @@ class BlockPlacementTest {
     /** MathUtils.sin/cos use a lookup table, ~1e-3 error at radius 4. */
     private val trigEps = 3e-3f
 
-    private fun place(uRel: Float, morph: Float = 0f) =
-        BlockPlacement.compose(uRel, near = 10f, length = 2f, width = 1f, height = 1f, lift = 0f,
-            morph = morph, radius = r, out = Matrix4())
+    private fun place(uRel: Float, shape: Float = 0f) =
+        BlockPlacement.compose(uRel * TunnelSurface.TAU, near = 10f, length = 2f, width = 1f, height = 1f, lift = 0f,
+            shape = shape, radius = r, out = Matrix4())
 
     @Test
     fun blockOnTheRightWallStandsOnItAndPointsToTheAxis() {
         val m = place(0.25f)
         // Bottom face centre touches the wall at x = R ...
         val bottom = Vector3(0f, -0.5f, 0f).mul(m)
-        assertEquals(r, bottom.x, eps); assertEquals(0f, bottom.y, eps)
+        assertEquals(r, bottom.x, trigEps); assertEquals(0f, bottom.y, trigEps)
         // ... and the top face centre is one unit closer to the tunnel axis.
         val top = Vector3(0f, 0.5f, 0f).mul(m)
-        assertEquals(r - 1f, top.x, eps); assertEquals(0f, top.y, eps)
+        assertEquals(r - 1f, top.x, trigEps); assertEquals(0f, top.y, trigEps)
         // Along-tunnel extent: near face at dist 10, far face at dist 12.
         assertEquals(-10f, Vector3(0f, 0f, 0.5f).mul(m).z, eps)
         assertEquals(-12f, Vector3(0f, 0f, -0.5f).mul(m).z, eps)
@@ -41,6 +41,15 @@ class BlockPlacementTest {
             assertEquals(left.dst(bottom), right.dst(bottom), trigEps)
             assertEquals(r * r + 0.25f, left.len2() - left.z * left.z, 0.03f)
         }
+    }
+
+    @Test
+    fun onTheOutsideTheBlockStandsOutwards() {
+        val m = place(0.25f, shape = 2f)
+        val bottom = Vector3(0f, -0.5f, 0f).mul(m)
+        val top = Vector3(0f, 0.5f, 0f).mul(m)
+        assertEquals(r, bottom.x, trigEps); assertEquals(-2f * r, bottom.y, trigEps)
+        assertEquals(r + 1f, top.x, trigEps); assertEquals(-2f * r, top.y, trigEps)
     }
 
     @Test
