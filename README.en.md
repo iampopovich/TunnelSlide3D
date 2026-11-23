@@ -15,16 +15,22 @@ the same zones and bonuses — with no ads, no network access and open source co
 or assets of the original were used; the rules come from public descriptions and gameplay
 videos.
 
-<p align="center">
-  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/1.png" width="280">
-  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/2.png" width="280">
-  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/3.png" width="280">
-</p>
-
-> Status: 0.9.0, the first public build. Tested on one phone (Redmi Note 9, LineageOS,
+> Status: 0.9.2. Tested on one phone (Redmi Note 9, LineageOS,
 > Android 17), on Linux and in Chromium (web build). Windows and macOS builds are produced
 > but have not been run. The web build has no sound yet. The interface is English-only; more languages will come, but
 > they are not the top priority.
+
+## Screenshots
+
+| Menu | Gameplay |
+|---|---|
+| <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/1.png" width="420"> | <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/2.png" width="420"> |
+| **Gameplay** | **Score after a crash** |
+| <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/3.png" width="420"> | <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/4.png" width="420"> |
+| **Settings** | |
+| <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/5.png" width="420"> | |
+
+Taken on Redmi Note 9 (2340 × 1080).
 
 ## What it does
 

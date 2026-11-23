@@ -14,15 +14,21 @@ SpeedX 3D (2010) была одной из лучших аркад на реак�
 но без рекламы, без доступа к сети и с открытым кодом. Код и ресурсы оригинала не
 использовались — правила собраны из публичных описаний и видео геймплея.
 
-<p align="center">
-  <img src="fastlane/metadata/android/ru/images/phoneScreenshots/1.png" width="280">
-  <img src="fastlane/metadata/android/ru/images/phoneScreenshots/2.png" width="280">
-  <img src="fastlane/metadata/android/ru/images/phoneScreenshots/3.png" width="280">
-</p>
-
-> Статус: 0.9.0, первая публичная сборка. Проверено на одном телефоне (Redmi Note 9,
+> Статус: 0.9.2. Проверено на одном телефоне (Redmi Note 9,
 > LineageOS, Android 17), на Linux и в Chromium (веб-версия). Сборки для Windows и macOS
 > собираются, но не запускались. В веб-версии пока нет звука.
+
+## Скриншоты
+
+| Меню | Игра |
+|---|---|
+| <img src="fastlane/metadata/android/ru/images/phoneScreenshots/1.png" width="420"> | <img src="fastlane/metadata/android/ru/images/phoneScreenshots/2.png" width="420"> |
+| **Игра** | **Счёт после крэша** |
+| <img src="fastlane/metadata/android/ru/images/phoneScreenshots/3.png" width="420"> | <img src="fastlane/metadata/android/ru/images/phoneScreenshots/4.png" width="420"> |
+| **Настройки** | |
+| <img src="fastlane/metadata/android/ru/images/phoneScreenshots/5.png" width="420"> | |
+
+Снято на Redmi Note 9 (2340 × 1080).
 
 ## Что умеет
 
