@@ -65,6 +65,10 @@ object GameConfig {
     const val ROUTE_TIME_WINDOW = 0.15f      // +- seconds checked around the player's arrival time
 
     // Bonuses
+    // Close call: passing an obstacle with less than this side clearance (in u, ~1/4 lane).
+    const val CLOSE_CALL_MARGIN = 0.0104f
+    /** Close-call points at the start speed; they scale with speed / START_SPEED. */
+    const val CLOSE_CALL_POINTS = 20f
     const val PICKUP_CHANCE = 0.45f          // chance to place a bonus in the pause after a pattern
     const val PICKUP_LENGTH = RING_LENGTH    // a bonus field fills exactly one floor tile
     const val PICKUP_HALF_WIDTH = 1f / 48f   // one lane wide

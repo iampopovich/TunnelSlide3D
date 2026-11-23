@@ -30,6 +30,7 @@ class Effects {
             RunEvent.QUAKE -> { startFlash(BonusKind.QUAKE.color, 0.6f, 0.7f); shakeLeft = 0.6f; Gdx.input.vibrate(200) }
             RunEvent.SLOWMO -> startFlash(BonusKind.SLOWMO.color, 0.5f, 0.5f)
             RunEvent.FOLD -> startFlash(BonusKind.FOLD.color, 0.5f, 0.6f)
+            RunEvent.CLOSE_CALL -> { startFlash(Color.WHITE, 0.07f, 0.15f); Gdx.input.vibrate(15) }
             RunEvent.VORTEX -> { startFlash(BonusKind.VORTEX.color, 0.55f, 0.8f); shakeLeft = 0.4f; Gdx.input.vibrate(100) }
         }
     }

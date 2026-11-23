@@ -69,6 +69,24 @@ class Obstacle(
     }
 
     /**
+     * Side clearance between a body of half-width [hw] at [pu] and this obstacle at [time]:
+     * negative when they overlap (same footprints as [overlapsU]).
+     */
+    fun clearanceU(pu: Float, hw: Float, time: Float, shape: Float): Float {
+        fun gap(c: Float) = kotlin.math.abs(TunnelSurface.wrapRel(c - pu)) - halfWidth - hw
+        return when (kind) {
+            ObstacleKind.BLOCK -> gap(u)
+            ObstacleKind.PILLAR -> if (shape < 0.5f) minOf(gap(u), gap(u + 0.5f)) else gap(u)
+            ObstacleKind.ROLLER -> {
+                val l = rollerLanes(time, tmp)
+                var g = gap(u + l[0] * step)
+                if (l[2] > 0f) g = minOf(g, gap(u + l[1] * step), gap(u + (l[0] + l[1]) * 0.5f * step))
+                g
+            }
+        }
+    }
+
+    /**
      * Where this obstacle will hit a player who keeps position [pu] until reaching it at
      * [time]: the centre of the dangerous spot, or null if it will miss.
      */
