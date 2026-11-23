@@ -22,8 +22,8 @@ videos.
 </p>
 
 > Status: 0.9.0, the first public build. Tested on one phone (Redmi Note 9, LineageOS,
-> Android 17) and on Linux. Windows and macOS builds are produced but have not been run;
-> there is no web version yet. The interface is English-only; more languages will come, but
+> Android 17), on Linux and in Chromium (web build). Windows and macOS builds are produced
+> but have not been run. The web build has no sound yet. The interface is English-only; more languages will come, but
 > they are not the top priority.
 
 ## What it does
@@ -49,6 +49,7 @@ The music is synthesised in the game, its tempo follows your speed.
 |---|---|---|
 | APK (GitHub Releases) | ~3.4 MB | Android 7.0+, OpenGL ES 2.0, landscape |
 | `TunnelSlide3D-desktop-*.jar` | ~19 MB | Linux / Windows / macOS, Java 17+: `java -jar …` |
+| `TunnelSlide3D-web.zip` | ~2.3 MB | any static hosting; a browser with WebGL, no sound |
 
 The only permission is vibration. No network, storage or analytics; best scores and settings
 live in the app's private preferences.
@@ -66,6 +67,8 @@ space, Esc.
 ./gradlew :android:installDebug              # debug build to a phone over adb
 ./gradlew :android:assembleRelease           # release (R8); signing via keystore.properties
 ./gradlew :lwjgl3:dist                       # single desktop jar
+./gradlew :web:gdx_teavm_web_js_run          # web build on http://localhost:8080
+./gradlew :web:gdx_teavm_web_js_release_build  # web/build/dist/js/release/webapp
 java tools/IconGen.java                      # regenerate the icon
 ```
 
@@ -84,7 +87,9 @@ Four rules hold the architecture together:
 
 Modules: `core` is the whole game (`world` — rules and generator, `render` — shaders, HUD
 and menu, `audio` — synthesiser, `ui` — menu logic without graphics); `android` and `lwjgl3`
-are thin launchers.
+are thin launchers; `web` is the browser build via
+[TeaVM](https://github.com/xpenatan/gdx-teavm), which compiles Kotlin bytecode to JavaScript,
+so `core` must not use `java.util.concurrent`.
 
 Adding an obstacle pattern: a new entry in `world/gen/Patterns.kt`. Lay the route with
 `PatternBuilder.go()`, place blocks anywhere — the generator removes whatever touches the

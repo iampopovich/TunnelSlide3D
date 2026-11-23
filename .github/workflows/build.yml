@@ -41,7 +41,7 @@ jobs:
           TS_KEYSTORE_PASSWORD: ${{ secrets.TS_KEYSTORE_PASSWORD }}
           TS_KEY_ALIAS: ${{ secrets.TS_KEY_ALIAS }}
           TS_KEY_PASSWORD: ${{ secrets.TS_KEY_PASSWORD }}
-        run: ./gradlew :android:assembleRelease :lwjgl3:dist --stacktrace
+        run: ./gradlew :android:assembleRelease :lwjgl3:dist :web:gdx_teavm_web_js_release_build --stacktrace
 
       - name: Collect artifacts
         run: |
@@ -50,6 +50,7 @@ jobs:
             cp "$f" "out/TunnelSlide3D-${GITHUB_REF_NAME//\//-}-$(basename "$f" | sed 's/android-//')"
           done
           cp lwjgl3/build/dist/*.jar out/
+          (cd web/build/dist/js/release/webapp && zip -qr "$GITHUB_WORKSPACE/out/TunnelSlide3D-web.zip" . -x 'WEB-INF/*')
 
       - uses: actions/upload-artifact@v4
         with:

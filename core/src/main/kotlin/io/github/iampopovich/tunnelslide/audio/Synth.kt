@@ -1,7 +1,6 @@
 package io.github.iampopovich.tunnelslide.audio
 
 import io.github.iampopovich.tunnelslide.GameConfig
-import java.util.concurrent.ConcurrentLinkedQueue
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.exp
@@ -24,8 +23,10 @@ class Synth(val rate: Int = 44100) {
     @Volatile var musicOn = true
     @Volatile var volume = 0.8f
 
-    private val queue = ConcurrentLinkedQueue<Sfx>()
-    fun play(s: Sfx) { queue.add(s) }
+    // Effects requested by the game thread; guarded by its own monitor (a plain deque +
+    // synchronized works on every backend, java.util.concurrent is missing in TeaVM).
+    private val queue = ArrayDeque<Sfx>()
+    fun play(s: Sfx) { synchronized(queue) { queue.addLast(s) } }
 
     /** Tempo in beats per minute for a given speed. */
     fun bpm(speed: Float): Float =
@@ -48,7 +49,9 @@ class Synth(val rate: Int = 44100) {
     private val voices = ArrayList<Voice>()
 
     fun render(out: FloatArray, n: Int) {
-        while (true) { val s = queue.poll() ?: break; if (voices.size < 8) voices.add(Voice(s)) }
+        synchronized(queue) {
+            while (queue.isNotEmpty()) { val s = queue.removeFirst(); if (voices.size < 8) voices.add(Voice(s)) }
+        }
         val dt = 1f / rate
         val scale = timeScale
         val pitch = if (scale < 1f) 0.75f else 1f
