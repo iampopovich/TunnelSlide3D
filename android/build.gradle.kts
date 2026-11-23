@@ -11,7 +11,9 @@ val signingProps = Properties().apply {
     val f = rootProject.file("keystore.properties")
     if (f.exists()) f.inputStream().use { load(it) }
 }
-fun signingValue(key: String): String? = signingProps.getProperty(key) ?: System.getenv(key)
+// Blank values count as missing (CI passes empty strings when secrets are not set).
+fun signingValue(key: String): String? =
+    (signingProps.getProperty(key) ?: System.getenv(key))?.takeIf { it.isNotBlank() }
 val releaseStore: String? = signingValue("TS_KEYSTORE")
 
 val gdxVersion: String = libs.versions.gdx.get()

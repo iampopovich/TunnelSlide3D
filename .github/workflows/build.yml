@@ -12,6 +12,9 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      # Job-level so that `if:` can see whether signing is configured.
+      HAS_KEYSTORE: ${{ secrets.TS_KEYSTORE_B64 != '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -27,18 +30,18 @@ jobs:
 
       # Signing secrets are optional: without them the release APK is unsigned.
       - name: Restore release keystore
-        if: ${{ env.KEYSTORE_B64 != '' }}
+        if: env.HAS_KEYSTORE == 'true'
         env:
           KEYSTORE_B64: ${{ secrets.TS_KEYSTORE_B64 }}
         run: echo "$KEYSTORE_B64" | base64 -d > release.jks
 
       - name: Build APK and desktop jar
         env:
-          TS_KEYSTORE: ${{ secrets.TS_KEYSTORE_B64 != '' && 'release.jks' || '' }}
+          TS_KEYSTORE: ${{ env.HAS_KEYSTORE == 'true' && 'release.jks' || '' }}
           TS_KEYSTORE_PASSWORD: ${{ secrets.TS_KEYSTORE_PASSWORD }}
           TS_KEY_ALIAS: ${{ secrets.TS_KEY_ALIAS }}
           TS_KEY_PASSWORD: ${{ secrets.TS_KEY_PASSWORD }}
-        run: ./gradlew :android:assembleRelease :lwjgl3:dist
+        run: ./gradlew :android:assembleRelease :lwjgl3:dist --stacktrace
 
       - name: Collect artifacts
         run: |
