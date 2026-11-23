@@ -71,12 +71,12 @@ class Synth(val rate: Int = 44100) {
             m += sin(2f * PI.toFloat() * humPhase) * if (drive) 0.06f else 0.025f
 
             var s = m * musicGain
-            for (v in voices) s += sfx(v, dt)
+            for (j in 0 until voices.size) s += sfx(voices[j], dt)
             // Soft clip keeps |out| < 1 no matter how many effects overlap.
             val x = s * volume
             out[i] = x / (1f + abs(x))
         }
-        voices.removeAll { it.t >= duration(it.kind) }
+        for (j in voices.size - 1 downTo 0) if (voices[j].t >= duration(voices[j].kind)) voices.removeAt(j)
     }
 
     private fun driveSample(dt: Float, pitch: Float, stepsPerSample: Double): Float {
@@ -129,16 +129,9 @@ class Synth(val rate: Int = 44100) {
         val d = duration(v.kind)
         val x = (v.t / d).coerceIn(0f, 1f)
         val env = (1f - x) * (1f - x)
-        val (f0, f1, noiseMix) = when (v.kind) {
-            Sfx.PICKUP -> Triple(700f, 1500f, 0f)
-            Sfx.SHIELD -> Triple(320f, 140f, 0.3f)
-            Sfx.QUAKE -> Triple(90f, 30f, 0.7f)
-            Sfx.SLOWMO -> Triple(900f, 180f, 0f)
-            Sfx.FOLD -> Triple(250f, 1000f, 0.1f)
-            Sfx.VORTEX -> Triple(200f + 120f * sin(v.t * 40f), 120f, 0.2f)
-            Sfx.CRASH -> Triple(120f, 40f, 0.8f)
-            Sfx.CLOSE_CALL -> Triple(1400f, 2600f, 0.35f)   // short airy swish
-        }
+        val o = v.kind.ordinal
+        val f0 = if (v.kind == Sfx.VORTEX) SFX_F0[o] + 120f * sin(v.t * 40f) else SFX_F0[o]
+        val f1 = SFX_F1[o]; val noiseMix = SFX_NOISE[o]
         val f = f0 * (f1 / f0).pow(x)
         v.phase = (v.phase + f * dt) % 1f
         val tone = if (v.kind == Sfx.SHIELD || v.kind == Sfx.VORTEX) (if (v.phase < 0.5f) 1f else -1f) * 0.6f
@@ -161,6 +154,24 @@ class Synth(val rate: Int = 44100) {
     }
 
     companion object {
+        // Per-effect pitch sweep start/end and noise share, indexed by Sfx.ordinal
+        // (a lookup instead of a Triple per sample: the audio thread must not allocate).
+        private val SFX_F0 = FloatArray(Sfx.entries.size)
+        private val SFX_F1 = FloatArray(Sfx.entries.size)
+        private val SFX_NOISE = FloatArray(Sfx.entries.size)
+        private fun sfxTone(k: Sfx, f0: Float, f1: Float, noise: Float) {
+            SFX_F0[k.ordinal] = f0; SFX_F1[k.ordinal] = f1; SFX_NOISE[k.ordinal] = noise
+        }
+        init {
+            sfxTone(Sfx.PICKUP, 700f, 1500f, 0f)
+            sfxTone(Sfx.SHIELD, 320f, 140f, 0.3f)
+            sfxTone(Sfx.QUAKE, 90f, 30f, 0.7f)
+            sfxTone(Sfx.SLOWMO, 900f, 180f, 0f)
+            sfxTone(Sfx.FOLD, 250f, 1000f, 0.1f)
+            sfxTone(Sfx.VORTEX, 200f, 120f, 0.2f)       // + wobble in sfx()
+            sfxTone(Sfx.CRASH, 120f, 40f, 0.8f)
+            sfxTone(Sfx.CLOSE_CALL, 1400f, 2600f, 0.35f) // short airy swish
+        }
         const val BPM_MIN = 112f
         const val BPM_MAX = 168f
         const val BPM_PER_SPEED = 1.0f

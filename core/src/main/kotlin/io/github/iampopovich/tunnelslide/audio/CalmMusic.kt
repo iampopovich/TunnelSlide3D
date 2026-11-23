@@ -73,8 +73,8 @@ internal class CalmMusic(private val rate: Int, seed: Int = 0x1F2E3D4C) {
     private var padCut = 0.1f
     private var lfo = 0f
 
-    private val combs = intArrayOf(1557, 1617, 1491, 1422).map { Comb(scaled(it)) }
-    private val allPasses = intArrayOf(556, 441).map { AllPass(scaled(it)) }
+    private val combs = intArrayOf(1557, 1617, 1491, 1422).let { d -> Array(d.size) { Comb(scaled(d[it])) } }
+    private val allPasses = intArrayOf(556, 441).let { d -> Array(d.size) { AllPass(scaled(d[it])) } }
 
     init { startPiece((rnd() * PIECES.size).toInt()) }
 
@@ -87,10 +87,11 @@ internal class CalmMusic(private val rate: Int, seed: Int = 0x1F2E3D4C) {
         phase += piece.bpm * (1f + 0.12f * k) * tempo / 60.0 * 2.0 / rate
         if (phase >= 1.0) { phase -= 1.0; nextEighth() }
 
+        val pr = pitch / rate
         var piano = 0f
         for (key in keys) {
             if (!key.active) continue
-            val inc = key.freq * pitch / rate
+            val inc = key.freq * pr
             key.p1 = wrap(key.p1 + inc); key.p2 = wrap(key.p2 + inc * 2f); key.p3 = wrap(key.p3 + inc * 3f)
             if (key.attack < 1f) key.attack = minOf(1f, key.attack + ATTACK_STEP * 44100f / rate)
             piano += (sine(key.p1) * key.e1 + sine(key.p2) * key.e2 + sine(key.p3) * key.e3) * key.attack
@@ -100,12 +101,16 @@ internal class CalmMusic(private val rate: Int, seed: Int = 0x1F2E3D4C) {
 
         var pad = 0f
         val padStep = 1f / (PAD_FADE_S * rate)
-        val it = pads.iterator()
-        while (it.hasNext()) {
-            val p = it.next()
+        // Index loop with swap-remove: this runs 44100 times a second, no iterators allowed.
+        var j = 0
+        while (j < pads.size) {
+            val p = pads[j]
             p.level += (p.target - p.level) * padStep * 3f
-            if (p.target == 0f && p.level < 1e-5f) { it.remove(); continue }
-            val inc = p.freq * pitch / rate
+            if (p.target == 0f && p.level < 1e-5f) {
+                pads[j] = pads[pads.size - 1]; pads.removeAt(pads.size - 1); continue
+            }
+            j++
+            val inc = p.freq * pr
             p.pa = wrap(p.pa + inc * 1.0015f); p.pb = wrap(p.pb + inc * 0.9985f); p.pc = wrap(p.pc + inc * 2f)
             pad += ((sine(p.pa) + sine(p.pb)) * 0.5f + sine(p.pc) * 0.2f) * p.level
         }
@@ -116,7 +121,7 @@ internal class CalmMusic(private val rate: Int, seed: Int = 0x1F2E3D4C) {
         val dry = piano * PIANO_GAIN + pad
         var wet = 0f
         val inp = dry * 0.3f
-        for (c in combs) wet += c.process(inp)
+        for (c in combs) wet += c.process(inp)       // arrays: no iterator allocation
         for (a in allPasses) wet = a.process(wet)
         return dry + wet * 0.45f
     }
@@ -156,7 +161,7 @@ internal class CalmMusic(private val rate: Int, seed: Int = 0x1F2E3D4C) {
             startPiece(next)
             bar = 0
         }
-        if (bar == playBars()) for (p in pads) p.target = 0f
+        if (bar == playBars()) for (j in pads.indices) pads[j].target = 0f
         // The first chord is an intro without melody; later bars sometimes rest.
         melodyBar = bar >= BARS_PER_CHORD && chance(0.78f)
     }
@@ -176,7 +181,7 @@ internal class CalmMusic(private val rate: Int, seed: Int = 0x1F2E3D4C) {
     private fun playBars() = piece.chords.size * BARS_PER_CHORD * 2
 
     private fun setPad(chord: IntArray) {
-        for (p in pads) p.target = 0f
+        for (j in pads.indices) pads[j].target = 0f
         val upper = chord.size - 1
         for (j in 1 until chord.size) pads.add(Pad(freq(chord[j]), PAD_GAIN / upper))
     }
