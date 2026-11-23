@@ -79,4 +79,19 @@ class ObstacleTest {
         assertEquals(null, r.threatAt(1.5f * lane, hw, resting, 0f))
         assertEquals(1.5f * lane, r.threatAt(1.5f * lane, hw, tick + resting, 0f)!!, 1e-5f)
     }
+
+    @Test
+    fun gridLineNextToPillarCrashesLikeNextToBlock() {
+        val lane = 1f / GameConfig.LANES
+        val hw = GameConfig.PLAYER_HALF_WIDTH
+        val block = Obstacle(0.5f * lane, lane * 0.5f * GameConfig.BLOCK_WIDTH_FILL, 0f, 1f, 1f, 0)
+        val pillar = Obstacle(0.5f * lane, lane * 0.5f * GameConfig.PILLAR_WIDTH_FILL, 0f, 1f, 8f, 0, ObstacleKind.PILLAR)
+        for (o in listOf(block, pillar)) {
+            // On the line between the obstacle's cell and the neighbour: hit, on both sides.
+            kotlin.test.assertTrue(o.overlapsU(lane, hw, 0f, 0f), "${o.kind} right line")
+            kotlin.test.assertTrue(o.overlapsU(0f, hw, 0f, 0f), "${o.kind} left line")
+            // Centre of the neighbouring cell: free.
+            kotlin.test.assertFalse(o.overlapsU(1.5f * lane, hw, 0f, 0f), "${o.kind} next cell")
+        }
+    }
 }

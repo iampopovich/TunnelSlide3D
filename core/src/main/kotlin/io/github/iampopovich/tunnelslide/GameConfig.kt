@@ -42,7 +42,8 @@ object GameConfig {
     const val ROW_Z_JITTER = 4f              // blocks of one row are spread over this depth
     const val BLOCK_HEIGHT = 1.1f
     const val BLOCK_WIDTH_FILL = 0.9f        // block width as a share of the lane
-    const val PILLAR_WIDTH_FILL = 0.7f
+    // Same as blocks: riding the grid line next to any obstacle is a crash (one rule for all).
+    const val PILLAR_WIDTH_FILL = BLOCK_WIDTH_FILL
     const val PILLAR_LENGTH = 0.9f
     const val REACH_SAFETY = 0.55f           // share of max turn the gap may drift per row
     const val TRAIL_LENGTH = 9f              // coloured warning strip in front of a block
