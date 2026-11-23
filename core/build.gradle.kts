@@ -20,3 +20,13 @@ dependencies {
 }
 
 tasks.test { useJUnitPlatform() }
+
+// Renders the soundtrack to WAV files (core/build/music-preview) to listen to it offline.
+tasks.register<JavaExec>("musicPreview") {
+    group = "verification"
+    description = "Renders the procedural soundtrack to WAV files"
+    dependsOn("testClasses")
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass.set("io.github.iampopovich.tunnelslide.audio.MusicPreviewKt")
+    args(layout.buildDirectory.dir("music-preview").get().asFile.absolutePath)
+}

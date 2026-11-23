@@ -8,6 +8,6 @@
 <li>Hazard zones: blackout, dark nebula, hue shift, gravity well, plasma cloud.</li>
 <li>Five difficulty levels with a separate best score each, tilt calibration.</li>
 <li>Classic style with heavy motion blur, red/cyan and green/magenta 3D glasses, monochrome mode.</li>
-<li>Procedural music whose tempo follows your speed.</li>
+<li>Procedural music: a calm generative piano, or a fast beat that follows your speed.</li>
 </ul>
 <p>Licence: GPL-3.0-or-later. Font: Orbitron (SIL OFL 1.1).</p>

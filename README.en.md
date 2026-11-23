@@ -41,7 +41,9 @@ your bonuses.
 
 **Settings.** Five difficulty levels with a separate best score each, tilt calibration,
 Classic style with heavy motion blur, 3D glasses (red/cyan, green/magenta), monochrome mode.
-The music is synthesised in the game, its tempo follows your speed.
+The music is synthesised in the game: a calm generative piano over pads by default (CALM),
+or a fast beat whose tempo follows your speed (DRIVE, in the settings).
+Listen without playing: `./gradlew :core:musicPreview` → `core/build/music-preview/*.wav`.
 
 ## Install
 

@@ -1,5 +1,7 @@
 package io.github.iampopovich.tunnelslide.ui
 
+import io.github.iampopovich.tunnelslide.audio.MusicStyle
+
 /**
  * Difficulty presets. Difficulty in the generator is 0..1; a level sets where it starts and
  * how fast it ramps up (ramp distance multiplier). Speed is the same for all levels: the
@@ -27,6 +29,7 @@ class Settings {
     var customStart = 0.5f
     var mono = false
     var sound = true
+    var music = MusicStyle.CALM
     var style = Style.VIBRANT
     var stereo = Stereo.OFF
     /** Accelerometer reading (screen-right axis, sign as used by steering) meaning "straight". */
