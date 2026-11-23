@@ -1,6 +1,18 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
 }
+
+// Release signing: keystore.properties in the repo root (gitignored) or the same keys as
+// environment variables (CI). Without them the release APK is built unsigned (F-Droid signs
+// its own builds). -PsignWithDebug=true signs release with the debug key for local testing.
+val signingProps = Properties().apply {
+    val f = rootProject.file("keystore.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
+fun signingValue(key: String): String? = signingProps.getProperty(key) ?: System.getenv(key)
+val releaseStore: String? = signingValue("TS_KEYSTORE")
 
 val gdxVersion: String = libs.versions.gdx.get()
 val abis = listOf("armeabi-v7a", "arm64-v8a", "x86_64")
@@ -36,8 +48,19 @@ android {
         applicationId = "io.github.iampopovich.tunnelslide"
         minSdk = 24
         targetSdk = 37
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 9
+        versionName = providers.gradleProperty("appVersion").get()
+    }
+
+    signingConfigs {
+        if (releaseStore != null) {
+            create("release") {
+                storeFile = rootProject.file(releaseStore)
+                storePassword = signingValue("TS_KEYSTORE_PASSWORD")
+                keyAlias = signingValue("TS_KEY_ALIAS")
+                keyPassword = signingValue("TS_KEY_PASSWORD")
+            }
+        }
     }
 
     sourceSets {
@@ -58,8 +81,22 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // R8 shrinks the APK; libGDX needs a few keep rules (proguard-rules.pro).
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = when {
+                releaseStore != null -> signingConfigs.getByName("release")
+                providers.gradleProperty("signWithDebug").orNull == "true" -> signingConfigs.getByName("debug")
+                else -> null
+            }
         }
+    }
+
+    // Reproducible builds for F-Droid: no build-time dependency metadata blob in the APK.
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
     }
 }
 
