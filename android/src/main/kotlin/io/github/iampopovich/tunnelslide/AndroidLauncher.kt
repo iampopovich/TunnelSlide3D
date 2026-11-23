@@ -13,6 +13,8 @@ class AndroidLauncher : AndroidApplication() {
         super.onCreate(savedInstanceState)
         val config = AndroidApplicationConfiguration().apply {
             useAccelerometer = true
+            // Default SENSOR_DELAY_GAME = 20 ms between readings; steering wants every one.
+            sensorDelay = android.hardware.SensorManager.SENSOR_DELAY_FASTEST
             useCompass = false
             useGyroscope = false
             useImmersiveMode = true
