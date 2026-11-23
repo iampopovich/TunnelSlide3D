@@ -7,7 +7,7 @@ import kotlin.math.exp
 
 enum class CrashReason { HIT, FELL }
 
-enum class RunEvent { PICKUP, SHIELD_HIT, QUAKE, SLOWMO, FOLD, VORTEX }
+enum class RunEvent { PICKUP, SHIELD_HIT, QUAKE, SLOWMO, FOLD, VORTEX, CLOSE_CALL }
 
 /** State of one run. Pure logic, no rendering, so it can be unit tested. */
 class RunState {
@@ -30,7 +30,25 @@ class RunState {
         private set
     val crashed: Boolean get() = crashReason != null
 
-    val score: Int get() = playerZ.toInt()
+    /** Points from close calls, added to the distance. */
+    var bonusPoints = 0
+        private set
+    val score: Int get() = playerZ.toInt() + bonusPoints
+
+    // --- Close calls ---
+    /** Obstacles grazed in the current pass, awarded once the player is past them unhurt. */
+    private val grazing = ArrayList<Obstacle>()
+    /** Points of the last close call and the game time it happened (for the HUD). */
+    var lastCloseCall = 0
+        private set
+    var lastCloseCallAt = -100f
+        private set
+    var closeCalls = 0
+        private set
+
+    /** Close-call reward at [speed]: grows linearly with the speed. */
+    fun closeCallPoints(speed: Float): Int =
+        MathUtils.round(GameConfig.CLOSE_CALL_POINTS * speed / GameConfig.START_SPEED)
 
     // --- Bonuses ---
     /** Shields left; each one absorbs one crash into an obstacle (not a fall). */
@@ -51,6 +69,7 @@ class RunState {
         playerU = 0f; zAcc = 0.0; speed = GameConfig.START_SPEED; turnRate = 0f; steps = 0L; dtSum = 0.0
         crashReason = null
         shields = 0; slot = null; slowLeft = 0f; event = null
+        bonusPoints = 0; grazing.clear(); lastCloseCall = 0; lastCloseCallAt = -100f; closeCalls = 0
     }
 
     /**
@@ -108,13 +127,30 @@ class RunState {
             if (abs(a1 - a0) > 0.5f) { crashReason = CrashReason.FELL; return }
         }
         field.pickupAt(playerU, fromZ, playerZ)?.let { collect(it) }
-        val hit = field.firstHit(playerU, fromZ, playerZ, time, field.zones.shapeAt(playerZ)) ?: return
+        val shape = field.zones.shapeAt(playerZ)
+        val hit = field.firstHit(playerU, fromZ, playerZ, time, shape)
+        if (hit == null) { checkCloseCalls(field, fromZ, shape); return }
+        grazing.remove(hit)
         if (shields > 0) {
             shields--
             field.destroy(hit)
             event = RunEvent.SHIELD_HIT
         } else {
             crashReason = CrashReason.HIT
+        }
+    }
+
+    private fun checkCloseCalls(field: ObstacleField, fromZ: Float, shape: Float) {
+        field.grazed(playerU, fromZ, playerZ, time, shape, grazing)
+        val it = grazing.iterator()
+        while (it.hasNext()) {
+            val o = it.next()
+            if (o.z + o.length >= playerZ - GameConfig.PLAYER_LENGTH) continue   // not past yet
+            it.remove()
+            val pts = closeCallPoints(speed)
+            bonusPoints += pts
+            lastCloseCall = pts; lastCloseCallAt = time; closeCalls++
+            if (event == null) event = RunEvent.CLOSE_CALL
         }
     }
 

@@ -153,7 +153,7 @@ class Hud : Disposable {
 
         batch.begin()
         label.color = LABEL
-        centered(label, "DIST", sideL, labelY)
+        centered(label, "SCORE", sideL, labelY)
         centered(label, "SPEED", cx, labelY)
         centered(label, "BEST", sideR, labelY)
         value.color = VALUE
@@ -164,6 +164,18 @@ class Hud : Disposable {
 
         label.color = FPS
         label.draw(batch, "FPS ${Gdx.graphics.framesPerSecond}", 12f, 12f + label.capHeight)
+
+        // Close call: "+N" with the speed multiplier, rising and fading for a second.
+        val age = run.time - run.lastCloseCallAt
+        if (age in 0f..CLOSE_CALL_SHOW) {
+            val k = age / CLOSE_CALL_SHOW
+            val y = viewport.worldHeight * (0.66f + 0.05f * k)
+            label.setColor(CLOSE_CALL.r, CLOSE_CALL.g, CLOSE_CALL.b, 1f - k * k)
+            centered(label, "CLOSE CALL", cx, y + label.lineHeight * 1.1f)
+            value.setColor(CLOSE_CALL.r, CLOSE_CALL.g, CLOSE_CALL.b, 1f - k * k)
+            centered(value, "+${run.lastCloseCall}  x${"%.1f".format(run.speed / GameConfig.START_SPEED)}", cx, y)
+            value.color = VALUE
+        }
         batch.end()
     }
 
@@ -273,6 +285,8 @@ class Hud : Disposable {
 
     companion object {
         const val RESTART_DELAY = 0.6f
+        private const val CLOSE_CALL_SHOW = 1f
+        private val CLOSE_CALL = Color(1f, 0.85f, 0.3f, 1f)
         /** Speed readout is shown x10 so it reads like km/h. Display only. */
         private const val SPEED_DISPLAY_SCALE = 10f
 

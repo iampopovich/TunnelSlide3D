@@ -288,6 +288,7 @@ class TunnelSlideGame(private val debug: DebugOptions = DebugOptions.NONE) : App
         RunEvent.SLOWMO -> Sfx.SLOWMO
         RunEvent.FOLD -> Sfx.FOLD
         RunEvent.VORTEX -> Sfx.VORTEX
+        RunEvent.CLOSE_CALL -> Sfx.CLOSE_CALL
     }
 
     override fun pause() { audio.stop() }
@@ -313,7 +314,7 @@ class TunnelSlideGame(private val debug: DebugOptions = DebugOptions.NONE) : App
         fx.reset()
         if (run.score > best) {
             best = run.score
-            prefs.putInteger(PREF_BEST, best).flush()
+            prefs.putInteger(bestKey(), best).flush()
         }
     }
 

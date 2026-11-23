@@ -7,7 +7,7 @@ import kotlin.math.exp
 import kotlin.math.pow
 import kotlin.math.sin
 
-enum class Sfx { PICKUP, SHIELD, QUAKE, SLOWMO, FOLD, VORTEX, CRASH }
+enum class Sfx { PICKUP, SHIELD, QUAKE, SLOWMO, FOLD, VORTEX, CRASH, CLOSE_CALL }
 
 /**
  * Procedural soundtrack and effects, rendered sample by sample (no audio files).
@@ -137,6 +137,7 @@ class Synth(val rate: Int = 44100) {
             Sfx.FOLD -> Triple(250f, 1000f, 0.1f)
             Sfx.VORTEX -> Triple(200f + 120f * sin(v.t * 40f), 120f, 0.2f)
             Sfx.CRASH -> Triple(120f, 40f, 0.8f)
+            Sfx.CLOSE_CALL -> Triple(1400f, 2600f, 0.35f)   // short airy swish
         }
         val f = f0 * (f1 / f0).pow(x)
         v.phase = (v.phase + f * dt) % 1f
@@ -148,7 +149,7 @@ class Synth(val rate: Int = 44100) {
 
     private fun duration(k: Sfx) = when (k) {
         Sfx.PICKUP -> 0.15f; Sfx.SHIELD -> 0.3f; Sfx.QUAKE -> 0.9f; Sfx.SLOWMO -> 0.6f
-        Sfx.FOLD -> 0.5f; Sfx.VORTEX -> 0.5f; Sfx.CRASH -> 0.8f
+        Sfx.FOLD -> 0.5f; Sfx.VORTEX -> 0.5f; Sfx.CRASH -> 0.8f; Sfx.CLOSE_CALL -> 0.12f
     }
 
     /** Deterministic white noise in [-1, 1] (xorshift). */

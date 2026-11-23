@@ -27,6 +27,7 @@ class ObstacleField(seed: Long) {
     private val pickupList = ArrayDeque<Pickup>()
     val pickups: Collection<Pickup> get() = pickupList
     internal fun pickupsForTest(): ArrayDeque<Pickup> = pickupList
+    internal fun obstaclesForTest(): ArrayDeque<Obstacle> = items
     /** Bumped whenever blocks are added, so renderers know when to rebuild their buffers. */
     var version = 0
         private set
@@ -81,6 +82,16 @@ class ObstacleField(seed: Long) {
             if (o.overlapsU(u, GameConfig.PLAYER_HALF_WIDTH, time, shape)) return o
         }
         return null
+    }
+
+    /** Adds to [out] every obstacle in the z sweep that the player passes closer than the close-call margin. */
+    fun grazed(u: Float, fromZ: Float, toZ: Float, time: Float, shape: Float, out: MutableList<Obstacle>) {
+        for (o in items) {
+            if (o.z > toZ + GameConfig.PLAYER_LENGTH) break   // sorted by z
+            if (o.z + o.length < fromZ) continue
+            val c = o.clearanceU(u, GameConfig.PLAYER_HALF_WIDTH, time, shape)
+            if (c >= 0f && c < GameConfig.CLOSE_CALL_MARGIN && o !in out) out.add(o)
+        }
     }
 
     /** Removes one obstacle (smashed by a shield). */
