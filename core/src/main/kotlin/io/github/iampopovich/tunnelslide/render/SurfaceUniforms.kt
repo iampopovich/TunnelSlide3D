@@ -20,6 +20,8 @@ class SurfaceUniforms {
     /** Hazard visuals, each 0..1 (faded in/out with the hazard). */
     var invertTunnel = 0f
         private set
+    /** 0..1: the setting (always 1) or the monochrome hazard fading in/out. */
+    private var monoAmount = 0f
     var invertBlocks = 0f
         private set
     var hue = 0f
@@ -35,8 +37,14 @@ class SurfaceUniforms {
     fun updateHazards(run: RunState, hazards: HazardTrack) {
         val h = hazards.at(run.playerZ)
         val k = hazards.intensity(run.playerZ)
-        invertTunnel = if (h?.kind == HazardKind.BLACKOUT) k else 0f
-        invertBlocks = if (h?.kind == HazardKind.NEBULA) k else 0f
+        // Negative/positive: a square wave with soft edges, so the flip is quick but not a strobe.
+        val flip = if (h?.kind == HazardKind.NEGATIVE) {
+            k * (0.5f + 0.5f * (kotlin.math.sin(run.time * TWO_PI / NEGATIVE_PERIOD) * 5f).coerceIn(-1f, 1f))
+        } else 0f
+        invertTunnel = maxOf(if (h?.kind == HazardKind.BLACKOUT) k else 0f, flip)
+        invertBlocks = maxOf(if (h?.kind == HazardKind.NEBULA) k else 0f, flip)
+        // Monochrome hazard drains colour gradually; the menu setting keeps it on for good.
+        monoAmount = maxOf(if (mono) 1f else 0f, if (h?.kind == HazardKind.MONOCHROME) k else 0f)
         // Hue keeps turning while the disco is on; amount fades with intensity.
         hue = if (h?.kind == HazardKind.HUESHIFT) k else 0f
         val gravity = if (h?.kind == HazardKind.GRAVITY) k else 0f
@@ -59,7 +67,7 @@ class SurfaceUniforms {
         shader.setUniformf("u_radius", GameConfig.TUNNEL_RADIUS)
         shader.setUniformf("u_playerA", playerA)
         shader.setUniformf("u_shape", shape)
-        shader.setUniformf("u_mono", if (mono) 1f else 0f)
+        shader.setUniformf("u_mono", monoAmount)
         shader.setUniformf("u_invertTunnel", invertTunnel)
         shader.setUniformf("u_invertBlocks", invertBlocks)
         shader.setUniformf("u_hueAmount", hue)
@@ -72,5 +80,6 @@ class SurfaceUniforms {
         private const val TWO_PI = 6.2831855f
         private const val GRAVITY_ROLL = 9f   // degrees of camera tilt towards the pull
         private const val GRAVITY_SWIRL = 0.7f
+        private const val NEGATIVE_PERIOD = 2.4f   // seconds per negative+positive cycle
     }
 }

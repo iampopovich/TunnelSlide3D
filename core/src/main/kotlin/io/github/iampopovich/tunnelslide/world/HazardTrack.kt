@@ -11,6 +11,10 @@ enum class HazardKind(val label: String, val color: Color, val minDifficulty: Fl
     BLACKOUT("BLACKOUT", Color(0.12f, 0.12f, 0.16f, 1f), 0f),
     /** The obstacles are drawn in negative. */
     NEBULA("DARK NEBULA", Color(0.6f, 0.4f, 1f, 1f), 0.1f),
+    /** Colour drains away: the whole scene turns black-and-white. */
+    MONOCHROME("MONOCHROME", Color(0.85f, 0.85f, 0.85f, 1f), 0.05f),
+    /** The whole scene flips between negative and positive on a beat. */
+    NEGATIVE("NEGATIVE", Color(0.95f, 0.35f, 0.1f, 1f), 0.2f),
     /** Disco: everything cycles through colours, warning trails lose their meaning. */
     HUESHIFT("HUE SHIFT", Color(1f, 0.3f, 0.9f, 1f), 0.15f),
     /** Pulls the player sideways and cuts the view distance. */
