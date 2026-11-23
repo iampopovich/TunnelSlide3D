@@ -1,0 +1,1 @@
+Close call: points for passing right next to an obstacle, more at higher speed. Score = distance + bonuses, a separate best per level. Less memory churn, fixed a possible crash when the app goes to the background.

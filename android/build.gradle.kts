@@ -50,7 +50,7 @@ android {
         applicationId = "io.github.iampopovich.tunnelslide"
         minSdk = 24
         targetSdk = 37
-        versionCode = 12
+        versionCode = 13
         versionName = providers.gradleProperty("appVersion").get()
     }
 

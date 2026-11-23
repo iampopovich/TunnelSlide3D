@@ -15,7 +15,7 @@ the same zones and bonuses — with no ads, no network access and open source co
 or assets of the original were used; the rules come from public descriptions and gameplay
 videos.
 
-> Status: 0.9.3. Tested on one phone (Redmi Note 9, LineageOS,
+> Status: 0.9.4. Tested on one phone (Redmi Note 9, LineageOS,
 > Android 17), on Linux and in Chromium (web build). Windows and macOS builds are produced
 > but have not been run. The web build has no sound yet. The interface is English-only; more languages will come, but
 > they are not the top priority.
