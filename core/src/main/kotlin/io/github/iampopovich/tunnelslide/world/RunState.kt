@@ -90,8 +90,8 @@ class RunState {
         // A gravity well adds a constant sideways pull on top of the player's steering.
         val pull = field?.hazards?.pullAt(playerZ) ?: 0f
         val target = MathUtils.clamp(steer, -1f, 1f) * GameConfig.MAX_TURN_RATE + pull
-        val k = 1f - exp(-GameConfig.TURN_RESPONSE * dt)
-        turnRate += (target - turnRate) * k
+        turnRate = if (GameConfig.TURN_RESPONSE <= 0f) target
+                   else turnRate + (target - turnRate) * (1f - exp(-GameConfig.TURN_RESPONSE * dt))
         val oldU = playerU
         playerU = TunnelSurface.wrapAbs(playerU + turnRate * dt)
         // Speed is a closed-form function of time (no float accumulation), see Kinematics.

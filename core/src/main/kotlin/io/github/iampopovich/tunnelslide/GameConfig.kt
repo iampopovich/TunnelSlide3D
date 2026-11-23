@@ -18,7 +18,7 @@ object GameConfig {
     const val ACCELERATION = 0.22f           // speed gain per second
     const val MAX_SPEED = 75f
     const val MAX_TURN_RATE = 0.55f          // revolutions per second at full tilt
-    const val TURN_RESPONSE = 28f            // how fast turn rate follows input, 1/s
+    const val TURN_RESPONSE = 0f // 0 = turn rate follows the tilt instantly (no inertia);           // how fast turn rate follows input, 1/s
 
     // Camera feel
     const val BASE_FOV = 68f
@@ -66,7 +66,7 @@ object GameConfig {
 
     // Bonuses
     const val PICKUP_CHANCE = 0.45f          // chance to place a bonus in the pause after a pattern
-    const val PICKUP_LENGTH = 2.2f
+    const val PICKUP_LENGTH = RING_LENGTH    // a bonus field fills exactly one floor tile
     const val PICKUP_HALF_WIDTH = 1f / 48f   // one lane wide
     const val MAX_SHIELDS = 3
     const val SLOWMO_SCALE = 0.5f            // game clock speed while time dilation is on

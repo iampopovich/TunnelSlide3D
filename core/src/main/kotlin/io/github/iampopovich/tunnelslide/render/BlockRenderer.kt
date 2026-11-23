@@ -54,7 +54,8 @@ class BlockRenderer : Disposable {
                     i = writeCube(out, i, p.u, p.z, 0.9f, GameConfig.PICKUP_HALF_WIDTH * 0.8f,
                         0.9f, 0.35f, surface.seam, 0, 0f, 0f, 0f, 0f, p.kind.color)
                 } else {
-                    i = writeCube(out, i, p.u, p.z, GameConfig.PICKUP_LENGTH, GameConfig.PICKUP_HALF_WIDTH * 0.9f,
+                    // Inset a little so the tile's grid lines stay visible around the field.
+                    i = writeCube(out, i, p.u, p.z + PAD_INSET, GameConfig.PICKUP_LENGTH - 2f * PAD_INSET, GameConfig.PICKUP_HALF_WIDTH * 0.94f,
                         0.06f, 0.03f, surface.seam, 0, 0f, 0f, 0f, 0f, p.kind.color)
                 }
             }
@@ -165,6 +166,7 @@ class BlockRenderer : Disposable {
     }
 
     companion object {
+        private const val PAD_INSET = 0.15f
         private const val FLOATS = 3 + 3 + 4 + 4 + 2 + 3
         private const val MIN_CAPACITY = 32
         private const val TRAIL_LIFT = 0.045f   // above the faceted tube surface
