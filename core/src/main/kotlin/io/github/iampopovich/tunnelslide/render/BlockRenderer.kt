@@ -10,7 +10,9 @@ import com.badlogic.gdx.graphics.VertexAttributes
 import com.badlogic.gdx.utils.Disposable
 import io.github.iampopovich.tunnelslide.GameConfig
 import io.github.iampopovich.tunnelslide.world.BonusKind
+import io.github.iampopovich.tunnelslide.world.Obstacle
 import io.github.iampopovich.tunnelslide.world.ObstacleField
+import io.github.iampopovich.tunnelslide.world.Pickup
 import io.github.iampopovich.tunnelslide.world.ObstacleKind
 import io.github.iampopovich.tunnelslide.world.RunState
 import io.github.iampopovich.tunnelslide.world.TunnelSurface
@@ -37,6 +39,8 @@ class BlockRenderer : Disposable {
     private var zBase = 0f
 
     private val threats = ArrayList<ObstacleField.Threat>()
+    private val visible = ArrayList<Pickup>()
+    private val visibleObstacles = ArrayList<Obstacle>()
 
     fun render(camera: Camera, run: RunState, field: ObstacleField, surface: SurfaceUniforms) {
         if (field.version != builtVersion || surface.seam != builtSeam) rebuild(field, surface.seam, run.playerZ)
@@ -44,7 +48,10 @@ class BlockRenderer : Disposable {
         val n = if (run.crashed) 0 else
             field.threats(run.playerU, run.playerZ, GameConfig.VIEW_DISTANCE, surface.shape, threats)
         // Bonus fields: a handful at most, rebuilt every frame (taken ones disappear).
-        val visible = field.pickups.filter { !it.taken && it.z + GameConfig.PICKUP_LENGTH > run.playerZ && it.z < run.playerZ + GameConfig.VIEW_DISTANCE }
+        visible.clear()
+        for (p in field.pickups) {
+            if (!p.taken && p.z + GameConfig.PICKUP_LENGTH > run.playerZ && p.z < run.playerZ + GameConfig.VIEW_DISTANCE) visible.add(p)
+        }
         padCount = visible.size
         pads = upload(pads, visible.size) { out ->
             var i = 0
@@ -98,7 +105,7 @@ class BlockRenderer : Disposable {
         builtVersion = field.version
         builtSeam = seam
         zBase = playerZ
-        val list = field.obstacles.toList()
+        val list = visibleObstacles.apply { clear(); addAll(field.obstacles) }
         blockCount = list.size
         blocks = upload(blocks, list.size) { out ->
             var i = 0
@@ -119,7 +126,8 @@ class BlockRenderer : Disposable {
         if (count == 0) return old
         val mesh = if (old != null && old.maxVertices >= count * 24) old else {
             old?.dispose()
-            val capacity = maxOf(count * 2, MIN_CAPACITY)
+            // 16-bit indices: a mesh holds at most MAX_CUBES; growth is capped there.
+            val capacity = maxOf(count * 2, MIN_CAPACITY).coerceAtMost(MAX_CUBES).coerceAtLeast(count)
             Mesh(
                 false, capacity * 24, capacity * 36,
                 VertexAttribute(VertexAttributes.Usage.Position, 3, "a_position"),
@@ -128,13 +136,12 @@ class BlockRenderer : Disposable {
                 VertexAttribute(VertexAttributes.Usage.Generic, 4, "a_extra"),
                 VertexAttribute(VertexAttributes.Usage.Generic, 2, "a_roll"),
                 VertexAttribute(VertexAttributes.Usage.ColorUnpacked, 3, "a_color"),
-            )
+            ).apply { setIndices(indicesFor(capacity)) }   // static pattern, set once per mesh
         }
         val size = count * 24 * FLOATS
         if (scratch.size < size) scratch = FloatArray(size)
         fill(scratch)
         mesh.setVertices(scratch, 0, size)
-        mesh.setIndices(indicesFor(count))
         return mesh
     }
 
@@ -169,6 +176,7 @@ class BlockRenderer : Disposable {
         private const val PAD_INSET = 0.15f
         private const val FLOATS = 3 + 3 + 4 + 4 + 2 + 3
         private const val MIN_CAPACITY = 32
+        private const val MAX_CUBES = 65535 / 24
         private const val TRAIL_LIFT = 0.045f   // above the faceted tube surface
 
         val BLOCK_COLORS = arrayOf(
@@ -214,7 +222,7 @@ class BlockRenderer : Disposable {
                     cachedIndices[o + 4] = (base + 3).toShort(); cachedIndices[o + 5] = base.toShort()
                 }
             }
-            return if (cachedIndices.size == need) cachedIndices else cachedIndices.copyOf(need)
+            return if (cachedIndices.size == need) cachedIndices else cachedIndices.copyOf(need)   // only on mesh growth
         }
     }
 }

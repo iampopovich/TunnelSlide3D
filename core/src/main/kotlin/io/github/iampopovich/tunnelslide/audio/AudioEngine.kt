@@ -10,7 +10,6 @@ import com.badlogic.gdx.audio.AudioDevice
  */
 class AudioEngine {
     val synth = Synth()
-    private var device: AudioDevice? = null
     private var thread: Thread? = null
     @Volatile private var running = false
 
@@ -22,13 +21,21 @@ class AudioEngine {
             Gdx.app.error("TunnelSlide3D", "audio unavailable: ${e.message}")
             return
         }
-        device = dev
         running = true
+        // The audio thread owns the device and disposes it itself: stop() may return before a
+        // blocking writeSamples() does, and disposing under it crashes (AudioTrack released).
+        // Any error ends the sound, never the game.
         thread = Thread({
             val buf = FloatArray(BUFFER)
-            while (running) {
-                synth.render(buf, buf.size)
-                dev.writeSamples(buf, 0, buf.size)
+            try {
+                while (running) {
+                    synth.render(buf, buf.size)
+                    dev.writeSamples(buf, 0, buf.size)
+                }
+            } catch (e: Throwable) {
+                Gdx.app.error("TunnelSlide3D", "audio stopped: $e")
+            } finally {
+                try { dev.dispose() } catch (_: Throwable) {}
             }
         }, "tunnelslide-audio").apply { isDaemon = true; start() }
         Gdx.app.log("TunnelSlide3D", "audio started, latency ${dev.latency} samples")
@@ -36,10 +43,9 @@ class AudioEngine {
 
     fun stop() {
         running = false
-        thread?.join(500)
+        // Wait for the old thread, so a quick resume never runs two renderers on one Synth.
+        thread?.join(1500)
         thread = null
-        device?.dispose()
-        device = null
     }
 
     companion object {

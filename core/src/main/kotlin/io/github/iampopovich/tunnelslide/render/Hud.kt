@@ -24,6 +24,21 @@ import kotlin.math.roundToInt
  */
 class Hud : Disposable {
     private val batch = SpriteBatch()
+
+    /** Re-formats a HUD number only when it changes: String.format every frame feeds the GC. */
+    private class CachedText {
+        private var key = Int.MIN_VALUE
+        private var text = ""
+        fun of(value: Int, format: (Int) -> String): String {
+            if (value != key) { key = value; text = format(value) }
+            return text
+        }
+    }
+    private val scoreText = CachedText()
+    private val bestText = CachedText()
+    private val speedText = CachedText()
+    private val fpsText = CachedText()
+    private val closeCallText = CachedText()
     private val shapes = ShapeRenderer()
     private val viewport = ScreenViewport()
     private val layout = GlyphLayout()
@@ -157,13 +172,13 @@ class Hud : Disposable {
         centered(label, "SPEED", cx, labelY)
         centered(label, "BEST", sideR, labelY)
         value.color = VALUE
-        centered(value, "%06d".format(run.score), sideL, valueY)
-        centered(value, "%06d".format(best), sideR, valueY)
+        centered(value, scoreText.of(run.score) { "%06d".format(it) }, sideL, valueY)
+        centered(value, bestText.of(best) { "%06d".format(it) }, sideR, valueY)
         big.color = VALUE
-        centered(big, (run.speed * SPEED_DISPLAY_SCALE).roundToInt().toString(), cx, valueY + p.height * 0.06f)
+        centered(big, speedText.of((run.speed * SPEED_DISPLAY_SCALE).roundToInt()) { it.toString() }, cx, valueY + p.height * 0.06f)
 
         label.color = FPS
-        label.draw(batch, "FPS ${Gdx.graphics.framesPerSecond}", 12f, 12f + label.capHeight)
+        label.draw(batch, fpsText.of(Gdx.graphics.framesPerSecond) { "FPS $it" }, 12f, 12f + label.capHeight)
 
         // Close call: "+N" with the speed multiplier, rising and fading for a second.
         val age = run.time - run.lastCloseCallAt
@@ -173,7 +188,7 @@ class Hud : Disposable {
             label.setColor(CLOSE_CALL.r, CLOSE_CALL.g, CLOSE_CALL.b, 1f - k * k)
             centered(label, "CLOSE CALL", cx, y + label.lineHeight * 1.1f)
             value.setColor(CLOSE_CALL.r, CLOSE_CALL.g, CLOSE_CALL.b, 1f - k * k)
-            centered(value, "+${run.lastCloseCall}  x${"%.1f".format(run.speed / GameConfig.START_SPEED)}", cx, y)
+            centered(value, closeCallText.of(run.closeCalls) { "+${run.lastCloseCall}  x${"%.1f".format(run.speed / GameConfig.START_SPEED)}" }, cx, y)
             value.color = VALUE
         }
         batch.end()
