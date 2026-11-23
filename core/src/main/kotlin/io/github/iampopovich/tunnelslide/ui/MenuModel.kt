@@ -1,8 +1,10 @@
 package io.github.iampopovich.tunnelslide.ui
 
+import io.github.iampopovich.tunnelslide.audio.MusicStyle
+
 enum class MenuScreen { MAIN, SETTINGS, CALIBRATE }
 
-enum class ItemId { PLAY, LEVEL, SETTINGS, STYLE, STEREO, MONO, SOUND, CALIBRATE, CUSTOM_START, CAPTURE, BACK }
+enum class ItemId { PLAY, LEVEL, SETTINGS, STYLE, STEREO, MONO, SOUND, MUSIC, CALIBRATE, CUSTOM_START, CAPTURE, BACK }
 
 /** One row; [value] is shown on the right with < > arrows when [adjustable]. */
 data class MenuItem(val id: ItemId, val text: String, val value: String? = null, val adjustable: Boolean = false)
@@ -31,6 +33,7 @@ class MenuModel(private val settings: Settings) {
             add(MenuItem(ItemId.STEREO, "3D GLASSES", settings.stereo.label, adjustable = true))
             add(MenuItem(ItemId.MONO, "MONOCHROME", onOff(settings.mono), adjustable = true))
             add(MenuItem(ItemId.SOUND, "SOUND", onOff(settings.sound), adjustable = true))
+            add(MenuItem(ItemId.MUSIC, "MUSIC", settings.music.label, adjustable = true))
             if (settings.level == Level.CUSTOM) {
                 add(MenuItem(ItemId.CUSTOM_START, "CUSTOM START", "${(settings.customStart * 100).toInt()}%", adjustable = true))
             }
@@ -65,6 +68,7 @@ class MenuModel(private val settings: Settings) {
             ItemId.STEREO -> { settings.stereo = cycle(Stereo.entries, settings.stereo, dir); MenuAction.CHANGED }
             ItemId.MONO -> { settings.mono = !settings.mono; MenuAction.CHANGED }
             ItemId.SOUND -> { settings.sound = !settings.sound; MenuAction.CHANGED }
+            ItemId.MUSIC -> { settings.music = cycle(MusicStyle.entries, settings.music, dir); MenuAction.CHANGED }
             ItemId.CUSTOM_START -> {
                 val steps = (settings.customStart * 10).toInt() + dir
                 settings.customStart = steps.coerceIn(0, 9) / 10f

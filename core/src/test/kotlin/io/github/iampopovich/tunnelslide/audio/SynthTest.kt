@@ -42,6 +42,24 @@ class SynthTest {
     }
 
     @Test
+    fun driveMusicIsAudibleAndNeverClips() {
+        val a = render(4f) { it.style = MusicStyle.DRIVE }
+        assertTrue(a.all { abs(it) < 1f })
+        assertTrue(rms(a) > 0.05f, "rms ${rms(a)}")
+    }
+
+    @Test
+    fun calmMusicKeepsPlayingSoftly() {
+        // 40 s covers more than one piece; every 2 s window has sound (pads, reverb tails),
+        // and the music stays well below the clip level.
+        val a = render(40f) { it.speed = GameConfig.MAX_SPEED }
+        val win = 2 * 22050
+        val windows = (0 until a.size / win).map { w -> rms(a.copyOfRange(w * win, (w + 1) * win)) }
+        assertTrue(windows.all { it > 0.005f }, "silent window: $windows")
+        assertTrue(a.maxOf { abs(it) } < 0.8f, "peak ${a.maxOf { abs(it) }}")
+    }
+
+    @Test
     fun tempoFollowsSpeed() {
         val s = Synth()
         assertTrue(s.bpm(GameConfig.START_SPEED) == Synth.BPM_MIN)

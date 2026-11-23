@@ -9,6 +9,7 @@ import com.badlogic.gdx.graphics.PerspectiveCamera
 import com.badlogic.gdx.math.MathUtils
 import com.badlogic.gdx.utils.TimeUtils
 import io.github.iampopovich.tunnelslide.audio.AudioEngine
+import io.github.iampopovich.tunnelslide.audio.MusicStyle
 import io.github.iampopovich.tunnelslide.audio.Sfx
 import io.github.iampopovich.tunnelslide.debug.DebugCapture
 import io.github.iampopovich.tunnelslide.debug.DebugOptions
@@ -134,6 +135,7 @@ class TunnelSlideGame(private val debug: DebugOptions = DebugOptions.NONE) : App
         settings.customStart = prefs.getFloat(PREF_CUSTOM, 0.5f)
         settings.mono = prefs.getBoolean(PREF_MONO, false)
         settings.sound = prefs.getBoolean(PREF_SOUND, true)
+        settings.music = MusicStyle.entries.firstOrNull { it.name == prefs.getString(PREF_MUSIC, "") } ?: MusicStyle.CALM
         settings.neutral = prefs.getFloat(PREF_NEUTRAL, 0f)
         settings.style = Style.entries.firstOrNull { it.name == prefs.getString(PREF_STYLE, "") } ?: Style.VIBRANT
         settings.stereo = Stereo.entries.firstOrNull { it.name == prefs.getString(PREF_STEREO, "") } ?: Stereo.OFF
@@ -145,12 +147,14 @@ class TunnelSlideGame(private val debug: DebugOptions = DebugOptions.NONE) : App
         steering.neutral = settings.neutral
         field.curve = { z -> settings.difficultyAt(z, GameConfig.DIFFICULTY_RAMP_DISTANCE) }
         best = prefs.getInteger(bestKey(), 0)
+        audio.synth.style = settings.music
         if (settings.sound) audio.start() else audio.stop()
         if (!save) return
         prefs.putString(PREF_LEVEL, settings.level.name)
         prefs.putFloat(PREF_CUSTOM, settings.customStart)
         prefs.putBoolean(PREF_MONO, settings.mono)
         prefs.putBoolean(PREF_SOUND, settings.sound)
+        prefs.putString(PREF_MUSIC, settings.music.name)
         prefs.putFloat(PREF_NEUTRAL, settings.neutral)
         prefs.putString(PREF_STYLE, settings.style.name)
         prefs.putString(PREF_STEREO, settings.stereo.name)
@@ -378,6 +382,7 @@ class TunnelSlideGame(private val debug: DebugOptions = DebugOptions.NONE) : App
         private const val PREF_NEUTRAL = "neutral"
         private const val PREF_STYLE = "style"
         private const val PREF_STEREO = "stereo"
+        private const val PREF_MUSIC = "music"
         /** Distance between the two stereo cameras, world units (tunnel radius is the scale). */
         private const val EYE_SEPARATION = 0.22f
         /** Distance at which the two eyes converge (zero parallax). */

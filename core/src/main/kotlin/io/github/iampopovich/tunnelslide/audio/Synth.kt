@@ -11,8 +11,9 @@ enum class Sfx { PICKUP, SHIELD, QUAKE, SLOWMO, FOLD, VORTEX, CRASH }
 
 /**
  * Procedural soundtrack and effects, rendered sample by sample (no audio files).
- * Music: a 4-bar loop (Am - F - C - G) of kick, hi-hat, bass and arpeggio whose tempo
- * follows the speed. Pure Kotlin, no libGDX: rendered on the audio thread and unit tested.
+ * Music, by [style]: CALM - generative ambient piano ([CalmMusic]); DRIVE - a 4-bar loop
+ * (Am - F - C - G) of kick, hi-hat, bass and arpeggio whose tempo follows the speed.
+ * Pure Kotlin, no libGDX: rendered on the audio thread and unit tested.
  *
  * Thread safety: the game thread only writes the @Volatile fields and queues effects.
  */
@@ -22,6 +23,9 @@ class Synth(val rate: Int = 44100) {
     @Volatile var timeScale = 1f
     @Volatile var musicOn = true
     @Volatile var volume = 0.8f
+    @Volatile var style = MusicStyle.CALM
+
+    private val calm = CalmMusic(rate)
 
     // Effects requested by the game thread; guarded by its own monitor (a plain deque +
     // synchronized works on every backend, java.util.concurrent is missing in TeaVM).
@@ -57,10 +61,27 @@ class Synth(val rate: Int = 44100) {
         val pitch = if (scale < 1f) 0.75f else 1f
         val stepsPerSample = bpm(speed) * scale / 60.0 * 4.0 / rate
         val targetGain = if (musicOn) 1f else 0f
+        val drive = style == MusicStyle.DRIVE
+        val k = ((speed - GameConfig.START_SPEED) / (GameConfig.MAX_SPEED - GameConfig.START_SPEED)).coerceIn(0f, 1f)
         for (i in 0 until n) {
+            musicGain += (targetGain - musicGain) * 0.0002f
+            var m = if (drive) driveSample(dt, pitch, stepsPerSample) else calm.sample(k, scale, pitch)
+            // Engine hum, a little higher the faster you go (quieter under the calm music).
+            humPhase = (humPhase + (40f + speed * 0.9f) * pitch * dt) % 1f
+            m += sin(2f * PI.toFloat() * humPhase) * if (drive) 0.06f else 0.025f
+
+            var s = m * musicGain
+            for (v in voices) s += sfx(v, dt)
+            // Soft clip keeps |out| < 1 no matter how many effects overlap.
+            val x = s * volume
+            out[i] = x / (1f + abs(x))
+        }
+        voices.removeAll { it.t >= duration(it.kind) }
+    }
+
+    private fun driveSample(dt: Float, pitch: Float, stepsPerSample: Double): Float {
             stepPhase += stepsPerSample
             if (stepPhase >= 1.0) { stepPhase -= 1.0; step = (step + 1) % 64; trigger(step) }
-            musicGain += (targetGain - musicGain) * 0.0002f
 
             var m = 0f
             // Kick: pitch sweep 140 -> 45 Hz.
@@ -88,17 +109,7 @@ class Synth(val rate: Int = 44100) {
                 val sq = if (arpPhase < 0.5f) 1f else -1f
                 m += sq * exp(-arpT * 25f) * 0.09f
             }
-            // Engine hum, a little higher the faster you go.
-            humPhase = (humPhase + (40f + speed * 0.9f) * pitch * dt) % 1f
-            m += sin(2f * PI.toFloat() * humPhase) * 0.06f
-
-            var s = m * musicGain
-            for (v in voices) s += sfx(v, dt)
-            // Soft clip keeps |out| < 1 no matter how many effects overlap.
-            val x = s * volume
-            out[i] = x / (1f + abs(x))
-        }
-        voices.removeAll { it.t >= duration(it.kind) }
+            return m
     }
 
     private fun trigger(step: Int) {
