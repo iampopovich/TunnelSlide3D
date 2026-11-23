@@ -1,0 +1,1 @@
+Steering without lag: the tilt turns at once. Bonus fields sit exactly on floor tiles. The screen stays on while playing.
