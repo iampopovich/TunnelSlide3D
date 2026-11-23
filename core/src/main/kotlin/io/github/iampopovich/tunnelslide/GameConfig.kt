@@ -18,7 +18,7 @@ object GameConfig {
     const val ACCELERATION = 0.22f           // speed gain per second
     const val MAX_SPEED = 75f
     const val MAX_TURN_RATE = 0.55f          // revolutions per second at full tilt
-    const val TURN_RESPONSE = 12f            // how fast turn rate follows input, 1/s
+    const val TURN_RESPONSE = 28f            // how fast turn rate follows input, 1/s
 
     // Camera feel
     const val BASE_FOV = 68f
