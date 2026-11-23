@@ -39,3 +39,8 @@ local.properties
 
 # Internal docs (plan, devlog, spec, screenshots) - local only, never commit
 docs/
+
+# Release signing (never commit)
+keystore.properties
+*.jks
+*.keystore

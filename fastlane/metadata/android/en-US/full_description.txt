@@ -1,0 +1,13 @@
+<p>TunnelSlide3D is an open-source remake of the classic tunnel arcade SpeedX 3D. You race down an endless neon tunnel that keeps speeding up; tilt the phone to slide around the walls and dodge the blocks.</p>
+<p>The original was abandoned years ago and its last builds are flagged by antivirus software because of ad SDKs. This remake recreates the rules and the feel from scratch: no ads, no trackers, no network access.</p>
+<p><b>What is inside</b></p>
+<ul>
+<li>The tunnel opens into a flat plane or turns inside out while you ride; you can fall off the edge of the plane.</li>
+<li>Obstacle patterns: walls, gates, spirals, wall-to-wall pillars, cubes that roll on a beat.</li>
+<li>Bonuses: shields, quake, time dilation, space fold.</li>
+<li>Hazard zones: blackout, dark nebula, hue shift, gravity well, plasma cloud.</li>
+<li>Five difficulty levels with a separate best score each, tilt calibration.</li>
+<li>Classic style with heavy motion blur, red/cyan and green/magenta 3D glasses, monochrome mode.</li>
+<li>Procedural music whose tempo follows your speed.</li>
+</ul>
+<p>Licence: GPL-3.0-or-later. Font: Orbitron (SIL OFL 1.1).</p>
