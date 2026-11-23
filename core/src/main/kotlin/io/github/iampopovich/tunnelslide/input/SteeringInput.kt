@@ -4,7 +4,6 @@ import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.Input
 import com.badlogic.gdx.math.MathUtils
 import kotlin.math.abs
-import kotlin.math.exp
 import kotlin.math.sin
 
 /**
@@ -18,7 +17,6 @@ class SteeringInput {
     var neutral = 0f
     var autopilot: ((Float) -> Float)? = null
 
-    private val filter = TiltFilter()
     private val hasAccel = Gdx.input.isPeripheralAvailable(Input.Peripheral.Accelerometer)
     /** True when steering is by tilting the device. */
     val tilt: Boolean get() = hasAccel
@@ -41,7 +39,8 @@ class SteeringInput {
 
         if (!hasAccel) return 0f
         val raw = tiltReading() - neutral
-        return shape(filter.update(raw / FULL_TILT, dt))
+        // No smoothing: the reading drives the turn at once; the dead zone hides sensor jitter.
+        return shape(raw / FULL_TILT)
     }
 
     /** Raw tilt in steering sign (calibration stores this as [neutral]). */
@@ -70,27 +69,3 @@ class SteeringInput {
     }
 }
 
-/**
- * Adaptive low-pass for the tilt (in steering units, 1 = full tilt). Holding still it
- * smooths hard (sensor jitter), on a real move it follows almost at once: the rate grows
- * with the distance between the reading and the filtered value. A fixed slow filter made
- * the controls feel viscous.
- */
-class TiltFilter {
-    var value = 0f
-        private set
-
-    fun update(raw: Float, dt: Float): Float {
-        val gap = abs(raw - value)
-        val rate = MIN_RATE + (MAX_RATE - MIN_RATE) * (gap / FAST_GAP).coerceAtMost(1f)
-        value += (raw - value) * (1f - exp(-rate * dt))
-        return value
-    }
-
-    companion object {
-        const val MIN_RATE = 15f
-        const val MAX_RATE = 90f
-        /** A gap this large (share of full tilt) gets the fastest response. */
-        const val FAST_GAP = 0.15f
-    }
-}

@@ -88,4 +88,29 @@ class BonusTest {
         driveUntil(run, field, 10f) { run.playerZ > z + GameConfig.ZONE_TRANSITION + 1f }
         assertEquals(0f, field.zones.shapeAt(run.playerZ))
     }
+
+    @Test
+    fun bonusFieldsSitExactlyOnFloorTiles() {
+        val lane = 1f / GameConfig.LANES
+        var seen = 0
+        for (seed in 1L..5L) {
+            val field = ObstacleField(seed)
+            var z = 0f
+            val found = HashSet<Pickup>()
+            while (z < 6000f) {
+                field.update(z, GameConfig.START_SPEED)
+                for (p in field.pickups) if (p.kind != BonusKind.VORTEX) found.add(p)
+                z += 50f
+            }
+            for (p in found) {
+                val tile = p.z / GameConfig.RING_LENGTH
+                kotlin.test.assertEquals(kotlin.math.round(tile), tile, 1e-3f, "z ${p.z} not on a tile edge")
+                val l = p.u / lane - 0.5f
+                kotlin.test.assertEquals(kotlin.math.round(l), l, 1e-3f, "u ${p.u} not a lane centre")
+            }
+            seen += found.size
+        }
+        // Still a fair number of bonuses: about one per 600 units on average.
+        kotlin.test.assertTrue(seen >= 25, "only $seen bonus fields in 5 x 6000 units")
+    }
 }

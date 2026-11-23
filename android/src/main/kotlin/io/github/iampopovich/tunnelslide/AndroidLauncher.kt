@@ -13,6 +13,8 @@ class AndroidLauncher : AndroidApplication() {
         super.onCreate(savedInstanceState)
         val config = AndroidApplicationConfiguration().apply {
             useAccelerometer = true
+            // Tilt steering never touches the screen: keep it from dimming during a run.
+            useWakelock = true
             // Default SENSOR_DELAY_GAME = 20 ms between readings; steering wants every one.
             sensorDelay = android.hardware.SensorManager.SENSOR_DELAY_FASTEST
             useCompass = false

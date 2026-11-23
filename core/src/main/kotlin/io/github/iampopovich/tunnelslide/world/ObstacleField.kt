@@ -157,9 +157,13 @@ class ObstacleField(seed: Long) {
 
     /** Puts a bonus field on the route in the empty stretch between two patterns. */
     private fun maybePlacePickup(fromZ: Float, toZ: Float) {
-        if (fromZ < GameConfig.FIRST_ROW_DISTANCE || toZ - fromZ < GameConfig.PICKUP_LENGTH * 3f) return
+        if (fromZ < GameConfig.FIRST_ROW_DISTANCE) return
+        // Snap to the floor grid: the field covers one whole tile (lane x ring) inside the pause.
+        val len = GameConfig.RING_LENGTH
+        val mid = MathUtils.lerp(fromZ, toZ - len, 0.5f)
+        val z = MathUtils.round(mid / len) * len
+        if (z < fromZ + PICKUP_CLEARANCE || z + len > toZ - PICKUP_CLEARANCE) return
         if (rng.nextFloat() >= GameConfig.PICKUP_CHANCE) return
-        val z = MathUtils.lerp(fromZ, toZ - GameConfig.PICKUP_LENGTH, 0.5f)
         val r = rng.nextFloat()
         val kind = when {
             r < 0.40f -> BonusKind.SHIELD
@@ -167,8 +171,11 @@ class ObstacleField(seed: Long) {
             r < 0.80f -> BonusKind.SLOWMO
             else -> BonusKind.FOLD
         }
-        // The route is straight inside the pause, so its u here is exact.
-        pickupList.addLast(Pickup(path.lastU, z, kind))
+        // The route is straight inside the pause; the lane centre nearest to it is at most half
+        // a lane away, which still lies inside the field (the field is one lane wide).
+        val lane = 1f / GameConfig.LANES
+        val u = TunnelSurface.wrapAbs((MathUtils.floor(TunnelSurface.wrapAbs(path.lastU) / lane) + 0.5f) * lane)
+        pickupList.addLast(Pickup(u, z, kind))
     }
 
     /** Plasma clouds scatter vortices anywhere (they are not lethal, the route ignores them). */
@@ -228,6 +235,8 @@ class ObstacleField(seed: Long) {
     }
 
     companion object {
+        /** Free space kept between a bonus field and the patterns around it. */
+        private const val PICKUP_CLEARANCE = 1f
         const val BLOCK_COLORS = PatternBuilder.BLOCK_COLORS
         private const val ROUTE_SAMPLE = 0.25f
         private const val ROUTE_TIME_SAMPLE = 0.03f
