@@ -21,8 +21,8 @@ SpeedX 3D (2010) была одной из лучших аркад на реак�
 </p>
 
 > Статус: 0.9.0, первая публичная сборка. Проверено на одном телефоне (Redmi Note 9,
-> LineageOS, Android 17) и на Linux. Сборки для Windows и macOS собираются, но не
-> запускались; веб-версии пока нет.
+> LineageOS, Android 17), на Linux и в Chromium (веб-версия). Сборки для Windows и macOS
+> собираются, но не запускались. В веб-версии пока нет звука.
 
 ## Что умеет
 
@@ -47,6 +47,7 @@ SpeedX 3D (2010) была одной из лучших аркад на реак�
 |---|---|---|
 | APK (GitHub Releases) | ~3,4 МБ | Android 7.0+, OpenGL ES 2.0, альбомная ориентация |
 | `TunnelSlide3D-desktop-*.jar` | ~19 МБ | Linux / Windows / macOS, Java 17+: `java -jar …` |
+| `TunnelSlide3D-web.zip` | ~2,3 МБ | любой статический хостинг; браузер с WebGL, без звука |
 
 Единственное разрешение — вибрация. Сеть, хранилище и аналитика не используются; рекорды и
 настройки лежат в приватных настройках приложения.
@@ -64,6 +65,8 @@ SpeedX 3D (2010) была одной из лучших аркад на реак�
 ./gradlew :android:installDebug              # debug-сборка на телефон через adb
 ./gradlew :android:assembleRelease           # release (R8); подпись — keystore.properties
 ./gradlew :lwjgl3:dist                       # один jar для ПК
+./gradlew :web:gdx_teavm_web_js_run          # веб-версия на http://localhost:8080
+./gradlew :web:gdx_teavm_web_js_release_build  # web/build/dist/js/release/webapp
 java tools/IconGen.java                      # пересобрать иконку
 ```
 
@@ -82,7 +85,8 @@ GLSL-шейдеры, gdx-freetype; физического движка нет.
 
 Модули: `core` — вся игра (`world` — правила и генератор, `render` — шейдеры, HUD и меню,
 `audio` — синтезатор, `ui` — логика меню без графики); `android` и `lwjgl3` — тонкие
-лаунчеры.
+лаунчеры; `web` — браузер через [TeaVM](https://github.com/xpenatan/gdx-teavm), он
+компилирует байткод Kotlin в JavaScript, поэтому в `core` нельзя `java.util.concurrent`.
 
 Как добавить паттерн препятствий: новый элемент в `world/gen/Patterns.kt`. Маршрут
 прокладывается через `PatternBuilder.go()`, блоки ставятся как угодно — всё, что задевает

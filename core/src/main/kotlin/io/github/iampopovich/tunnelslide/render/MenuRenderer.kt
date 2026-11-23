@@ -53,7 +53,8 @@ class MenuRenderer(private val hud: Hud) : Disposable {
         val area = h * 0.62f
         val rowH = minOf(h * 0.105f, area / (items.size * 1.3f))
         val gap = rowH * 0.28f
-        val rowW = minOf(w * 0.5f, h * 1.15f)
+        // Wide enough for "DIFFICULTY  < EXTREME >" also in small browser windows.
+        val rowW = minOf(w * 0.9f, maxOf(w * 0.5f, h * 1.1f))
         val x0 = (w - rowW) / 2f
         val total = items.size * rowH + (items.size - 1) * gap
         val top = h * 0.44f + minOf(total, area) / 2f
