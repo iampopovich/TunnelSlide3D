@@ -35,6 +35,17 @@ jobs:
           KEYSTORE_B64: ${{ secrets.TS_KEYSTORE_B64 }}
         run: echo "$KEYSTORE_B64" | base64 -d > release.jks
 
+      # Fails early with a readable reason (prints sizes and aliases only, never secrets).
+      - name: Check release keystore
+        if: env.HAS_KEYSTORE == 'true'
+        env:
+          STORE_PASS: ${{ secrets.TS_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.TS_KEY_ALIAS }}
+        run: |
+          echo "keystore bytes: $(wc -c < release.jks), alias length: ${#KEY_ALIAS}, password length: ${#STORE_PASS}"
+          keytool -list -keystore release.jks -storepass "$STORE_PASS" | grep -iE 'entry|keystore type' || { echo "::error::keytool cannot open release.jks: wrong TS_KEYSTORE_PASSWORD or broken TS_KEYSTORE_B64"; exit 1; }
+          keytool -list -keystore release.jks -storepass "$STORE_PASS" -alias "$KEY_ALIAS" > /dev/null || { echo "::error::alias '$KEY_ALIAS' not found in release.jks (TS_KEY_ALIAS)"; exit 1; }
+
       - name: Build APK and desktop jar
         env:
           TS_KEYSTORE: ${{ env.HAS_KEYSTORE == 'true' && 'release.jks' || '' }}
