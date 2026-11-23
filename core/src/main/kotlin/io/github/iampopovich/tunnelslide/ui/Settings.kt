@@ -14,6 +14,12 @@ enum class Level(val label: String, val start: Float, val rampScale: Float) {
     CUSTOM("CUSTOM", 0f, 1f),
 }
 
+/** Graphics style: Classic adds strong motion blur. */
+enum class Style(val label: String) { VIBRANT("VIBRANT"), CLASSIC("CLASSIC") }
+
+/** Anaglyph glasses. */
+enum class Stereo(val label: String) { OFF("OFF"), RED_CYAN("RED/CYAN"), GREEN_MAGENTA("GREEN/MAGENTA") }
+
 /** Everything the player can change; persisted by the game through libGDX Preferences. */
 class Settings {
     var level = Level.NORMAL
@@ -21,6 +27,8 @@ class Settings {
     var customStart = 0.5f
     var mono = false
     var sound = true
+    var style = Style.VIBRANT
+    var stereo = Stereo.OFF
     /** Accelerometer reading (screen-right axis, sign as used by steering) meaning "straight". */
     var neutral = 0f
 

@@ -28,6 +28,9 @@ class SurfaceUniforms {
         private set
     var hazardRoll = 0f
         private set
+    /** Gravity-well image twist for the post pass, radians at the centre (signed). */
+    var swirl = 0f
+        private set
 
     fun updateHazards(run: RunState, hazards: HazardTrack) {
         val h = hazards.at(run.playerZ)
@@ -39,6 +42,7 @@ class SurfaceUniforms {
         val gravity = if (h?.kind == HazardKind.GRAVITY) k else 0f
         fogDist = GameConfig.VIEW_DISTANCE * (1f - (1f - GameConfig.GRAVITY_FOG) * gravity)
         hazardRoll = gravity * (h?.dir ?: 0) * GRAVITY_ROLL
+        swirl = gravity * (h?.dir ?: 0) * GRAVITY_SWIRL
         time = run.time
     }
 
@@ -67,5 +71,6 @@ class SurfaceUniforms {
         private const val HUE_SPEED = 2.5f
         private const val TWO_PI = 6.2831855f
         private const val GRAVITY_ROLL = 9f   // degrees of camera tilt towards the pull
+        private const val GRAVITY_SWIRL = 0.7f
     }
 }

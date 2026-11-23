@@ -17,6 +17,7 @@ import io.github.iampopovich.tunnelslide.render.BlockRenderer
 import io.github.iampopovich.tunnelslide.render.Effects
 import io.github.iampopovich.tunnelslide.render.Hud
 import io.github.iampopovich.tunnelslide.render.MenuRenderer
+import io.github.iampopovich.tunnelslide.render.PostProcess
 import io.github.iampopovich.tunnelslide.render.Palette
 import io.github.iampopovich.tunnelslide.render.SurfaceUniforms
 import io.github.iampopovich.tunnelslide.render.TunnelRenderer
@@ -25,6 +26,8 @@ import io.github.iampopovich.tunnelslide.ui.MenuAction
 import io.github.iampopovich.tunnelslide.ui.MenuModel
 import io.github.iampopovich.tunnelslide.ui.MenuScreen
 import io.github.iampopovich.tunnelslide.ui.Settings
+import io.github.iampopovich.tunnelslide.ui.Stereo
+import io.github.iampopovich.tunnelslide.ui.Style
 import io.github.iampopovich.tunnelslide.world.Autopilot
 import io.github.iampopovich.tunnelslide.world.HazardKind
 import io.github.iampopovich.tunnelslide.world.ObstacleField
@@ -49,6 +52,7 @@ class TunnelSlideGame(private val debug: DebugOptions = DebugOptions.NONE) : App
     private val settings = Settings()
     private val menu = MenuModel(settings)
     private lateinit var menuView: MenuRenderer
+    private lateinit var post: PostProcess
     /** Menu is up: the tunnel behind it is an attract-mode run driven by the bot. */
     private var inMenu = true
     private var clock = 0f
@@ -77,6 +81,7 @@ class TunnelSlideGame(private val debug: DebugOptions = DebugOptions.NONE) : App
         blocks = BlockRenderer()
         hud = Hud()
         menuView = MenuRenderer(hud)
+        post = PostProcess()
         steering = SteeringInput()
         // Back is routed by the platform launcher into requestBack(): libGDX's own catch would
         // register a second predictive-back callback on Android 13+.
@@ -84,6 +89,8 @@ class TunnelSlideGame(private val debug: DebugOptions = DebugOptions.NONE) : App
         loadSettings()
         if (debug.has("TS_MONO")) settings.mono = true
         if (debug.has("TS_NOAUDIO")) settings.sound = false
+        if (debug.has("TS_CLASSIC")) settings.style = Style.CLASSIC
+        debug["TS_STEREO"]?.let { n -> Stereo.entries.firstOrNull { it.name.equals(n, true) }?.let { settings.stereo = it } }
         debug["TS_LEVEL"]?.let { n -> Level.entries.firstOrNull { it.name.equals(n, true) }?.let { settings.level = it } }
         applySettings(save = false)
         // Automated runs (autopilot, screenshots) skip the menu unless TS_MENU asks for it.
@@ -111,6 +118,7 @@ class TunnelSlideGame(private val debug: DebugOptions = DebugOptions.NONE) : App
         accumulator = 0f
         crashAge = -1f
         fx.reset()
+        if (::post.isInitialized) post.restart()
     }
 
     override fun resize(width: Int, height: Int) {
@@ -118,6 +126,7 @@ class TunnelSlideGame(private val debug: DebugOptions = DebugOptions.NONE) : App
         camera.viewportHeight = height.toFloat()
         hud.resize(width, height)
         menuView.resize(width, height)
+        post.resize(width, height)
     }
 
     private fun loadSettings() {
@@ -126,6 +135,8 @@ class TunnelSlideGame(private val debug: DebugOptions = DebugOptions.NONE) : App
         settings.mono = prefs.getBoolean(PREF_MONO, false)
         settings.sound = prefs.getBoolean(PREF_SOUND, true)
         settings.neutral = prefs.getFloat(PREF_NEUTRAL, 0f)
+        settings.style = Style.entries.firstOrNull { it.name == prefs.getString(PREF_STYLE, "") } ?: Style.VIBRANT
+        settings.stereo = Stereo.entries.firstOrNull { it.name == prefs.getString(PREF_STEREO, "") } ?: Stereo.OFF
     }
 
     /** Pushes the settings into the game systems and (optionally) saves them. */
@@ -141,6 +152,8 @@ class TunnelSlideGame(private val debug: DebugOptions = DebugOptions.NONE) : App
         prefs.putBoolean(PREF_MONO, settings.mono)
         prefs.putBoolean(PREF_SOUND, settings.sound)
         prefs.putFloat(PREF_NEUTRAL, settings.neutral)
+        prefs.putString(PREF_STYLE, settings.style.name)
+        prefs.putString(PREF_STEREO, settings.stereo.name)
         prefs.flush()
     }
 
@@ -226,13 +239,15 @@ class TunnelSlideGame(private val debug: DebugOptions = DebugOptions.NONE) : App
 
         surface.update(run, field.zones)
         surface.updateHazards(run, field.hazards)
-        updateCamera()
-        // In a blackout the background (fog) turns light as well.
-        val bg = MathUtils.lerp(Palette.FOG.r, 0.85f, surface.invertTunnel)
-        Gdx.gl.glClearColor(bg, MathUtils.lerp(Palette.FOG.g, 0.85f, surface.invertTunnel), MathUtils.lerp(Palette.FOG.b, 0.85f, surface.invertTunnel), 1f)
-        Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT or GL20.GL_DEPTH_BUFFER_BIT)
-        tunnel.render(camera, run, surface)
-        blocks.render(camera, run, field, surface)
+        val stereo = settings.stereo.ordinal
+        val blur = if (settings.style == Style.CLASSIC) classicBlur() else 0f
+        if (stereo == 0 && blur == 0f && surface.swirl == 0f) {
+            drawScene(0f)
+        } else {
+            post.captureEye(0) { drawScene(if (stereo > 0) -EYE_SEPARATION / 2f else 0f) }
+            if (stereo > 0) post.captureEye(1) { drawScene(EYE_SEPARATION / 2f) }
+            post.present(stereo, blur, surface.swirl)
+        }
         if (inMenu) {
             val hint = if (menu.screen == MenuScreen.CALIBRATE) {
                 if (steering.tilt) "HOLD THE PHONE AS YOU PLAY, THEN TAP SET STRAIGHT   (TILT %+.1f)".format(steering.tiltReading() - settings.neutral)
@@ -296,7 +311,24 @@ class TunnelSlideGame(private val debug: DebugOptions = DebugOptions.NONE) : App
         }
     }
 
-    private fun updateCamera() {
+    /** Classic style: share of the previous frame kept; the faster, the longer the trails. */
+    private fun classicBlur(): Float {
+        val k = ((run.speed - GameConfig.START_SPEED) / (GameConfig.MAX_SPEED - GameConfig.START_SPEED)).coerceIn(0f, 1f)
+        return 0.55f + 0.25f * k
+    }
+
+    /** One view of the 3D scene; [eyeOffset] shifts the camera sideways for stereo. */
+    private fun drawScene(eyeOffset: Float) {
+        updateCamera(eyeOffset)
+        // In a blackout the background (fog) turns light as well.
+        val bg = MathUtils.lerp(Palette.FOG.r, 0.85f, surface.invertTunnel)
+        Gdx.gl.glClearColor(bg, MathUtils.lerp(Palette.FOG.g, 0.85f, surface.invertTunnel), MathUtils.lerp(Palette.FOG.b, 0.85f, surface.invertTunnel), 1f)
+        Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT or GL20.GL_DEPTH_BUFFER_BIT)
+        tunnel.render(camera, run, surface)
+        blocks.render(camera, run, field, surface)
+    }
+
+    private fun updateCamera(eyeOffset: Float = 0f) {
         val eyeY = -GameConfig.TUNNEL_RADIUS + GameConfig.CAMERA_HEIGHT
         camera.fieldOfView = minOf(
             GameConfig.MAX_FOV,
@@ -308,6 +340,16 @@ class TunnelSlideGame(private val debug: DebugOptions = DebugOptions.NONE) : App
         // Roll slightly into the turn: makes steering readable even in a symmetric tube.
         val roll = run.turnRate / GameConfig.MAX_TURN_RATE * GameConfig.ROLL_PER_TURN + surface.hazardRoll
         camera.rotate(camera.direction, roll)
+        if (eyeOffset != 0f) {
+            // Shift along the camera's own right axis (it may be rolled), then turn both eyes
+            // to a common point ahead (toe-in): things at that distance sit on the screen
+            // plane, nearer ones pop out. Parallel eyes would put the whole tunnel in front
+            // of the screen with huge disparity on the near walls.
+            val focus = camera.position.cpy().mulAdd(camera.direction, STEREO_FOCUS)
+            val right = camera.direction.cpy().crs(camera.up).nor()
+            camera.position.mulAdd(right, eyeOffset)
+            camera.direction.set(focus).sub(camera.position).nor()
+        }
         camera.update()
     }
 
@@ -317,6 +359,7 @@ class TunnelSlideGame(private val debug: DebugOptions = DebugOptions.NONE) : App
         blocks.dispose()
         hud.dispose()
         menuView.dispose()
+        post.dispose()
     }
 
     companion object {
@@ -327,5 +370,11 @@ class TunnelSlideGame(private val debug: DebugOptions = DebugOptions.NONE) : App
         private const val PREF_LEVEL = "level"
         private const val PREF_CUSTOM = "customStart"
         private const val PREF_NEUTRAL = "neutral"
+        private const val PREF_STYLE = "style"
+        private const val PREF_STEREO = "stereo"
+        /** Distance between the two stereo cameras, world units (tunnel radius is the scale). */
+        private const val EYE_SEPARATION = 0.22f
+        /** Distance at which the two eyes converge (zero parallax). */
+        private const val STEREO_FOCUS = 10f
     }
 }

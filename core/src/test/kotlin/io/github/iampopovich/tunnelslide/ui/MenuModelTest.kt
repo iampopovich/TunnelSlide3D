@@ -48,6 +48,15 @@ class MenuModelTest {
     }
 
     @Test
+    fun styleAndStereoCycle() {
+        menu.press(indexOf(ItemId.SETTINGS))
+        menu.press(indexOf(ItemId.STYLE)); assertEquals(Style.CLASSIC, settings.style)
+        menu.press(indexOf(ItemId.STYLE)); assertEquals(Style.VIBRANT, settings.style)
+        menu.press(indexOf(ItemId.STEREO), -1); assertEquals(Stereo.GREEN_MAGENTA, settings.stereo)
+        menu.press(indexOf(ItemId.STEREO), +1); assertEquals(Stereo.OFF, settings.stereo)
+    }
+
+    @Test
     fun backGoesUpThenExits() {
         menu.press(indexOf(ItemId.SETTINGS))
         assertEquals(MenuAction.NONE, menu.back())
