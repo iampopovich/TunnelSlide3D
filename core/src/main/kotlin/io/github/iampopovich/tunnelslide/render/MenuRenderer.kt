@@ -49,12 +49,14 @@ class MenuRenderer(private val hud: Hud) : Disposable {
         batch.projectionMatrix = viewport.camera.combined
 
         val items = menu.items()
-        val rowH = h * 0.105f
-        val gap = h * 0.03f
+        // Rows fit between the title and the hint line, however many there are.
+        val area = h * 0.62f
+        val rowH = minOf(h * 0.105f, area / (items.size * 1.3f))
+        val gap = rowH * 0.28f
         val rowW = minOf(w * 0.5f, h * 1.15f)
         val x0 = (w - rowW) / 2f
         val total = items.size * rowH + (items.size - 1) * gap
-        val top = h * 0.66f - (if (items.size > 3) (items.size - 3) * (rowH + gap) * 0.35f else 0f)
+        val top = h * 0.44f + minOf(total, area) / 2f
         rows.clear()
         for (i in items.indices) rows.add(Rectangle(x0, top - i * (rowH + gap) - rowH, rowW, rowH))
 
@@ -108,7 +110,7 @@ class MenuRenderer(private val hud: Hud) : Disposable {
             label.color = HINT
             val bottomRow = rows.lastOrNull()?.y ?: h * 0.2f
             hint?.let { centered(label, it, w / 2f, bottomRow - h * 0.06f) }
-            if (menu.screen == MenuScreen.MAIN && best > 0) centered(label, "BEST  %06d".format(best), w / 2f, h * 0.76f)
+            if (menu.screen == MenuScreen.MAIN && best > 0) centered(label, "BEST  %06d".format(best), w / 2f, top + h * 0.05f)
         }
         batch.end()
         Gdx.gl.glDisable(GL20.GL_BLEND)
