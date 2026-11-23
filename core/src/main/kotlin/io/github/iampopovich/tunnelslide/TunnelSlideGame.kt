@@ -241,8 +241,10 @@ class TunnelSlideGame(private val debug: DebugOptions = DebugOptions.NONE) : App
         surface.updateHazards(run, field.hazards)
         val stereo = settings.stereo.ordinal
         val blur = if (settings.style == Style.CLASSIC) classicBlur() else 0f
-        if (stereo == 0 && blur == 0f && surface.swirl == 0f) {
+        if (stereo == 0 && blur < MIN_BLUR && surface.swirl == 0f) {
             drawScene(0f)
+            // The history buffer is stale now; the blur must not start from an old frame.
+            post.restart()
         } else {
             post.captureEye(0) { drawScene(if (stereo > 0) -EYE_SEPARATION / 2f else 0f) }
             if (stereo > 0) post.captureEye(1) { drawScene(EYE_SEPARATION / 2f) }
@@ -311,10 +313,14 @@ class TunnelSlideGame(private val debug: DebugOptions = DebugOptions.NONE) : App
         }
     }
 
-    /** Classic style: share of the previous frame kept; the faster, the longer the trails. */
+    /**
+     * Classic style: share of the previous frame kept. None at the start, then it grows with
+     * speed (eased in), so the trails themselves show the acceleration.
+     */
     private fun classicBlur(): Float {
         val k = ((run.speed - GameConfig.START_SPEED) / (GameConfig.MAX_SPEED - GameConfig.START_SPEED)).coerceIn(0f, 1f)
-        return 0.55f + 0.25f * k
+        val eased = k * k * (3f - 2f * k)
+        return CLASSIC_MAX_BLUR * eased
     }
 
     /** One view of the 3D scene; [eyeOffset] shifts the camera sideways for stereo. */
@@ -376,5 +382,8 @@ class TunnelSlideGame(private val debug: DebugOptions = DebugOptions.NONE) : App
         private const val EYE_SEPARATION = 0.22f
         /** Distance at which the two eyes converge (zero parallax). */
         private const val STEREO_FOCUS = 10f
+        /** Classic blur at top speed; below MIN_BLUR the post pass is skipped. */
+        private const val CLASSIC_MAX_BLUR = 0.82f
+        private const val MIN_BLUR = 0.02f
     }
 }

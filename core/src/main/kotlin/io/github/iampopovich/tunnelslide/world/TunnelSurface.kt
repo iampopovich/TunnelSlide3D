@@ -3,6 +3,9 @@ package io.github.iampopovich.tunnelslide.world
 import com.badlogic.gdx.math.MathUtils
 import com.badlogic.gdx.math.Vector2
 import com.badlogic.gdx.math.Vector3
+import kotlin.math.abs
+import kotlin.math.cos
+import kotlin.math.sin
 
 /**
  * Maps tunnel coordinates to 3D. MUST stay in sync with assets/shaders/tunnel.vert.
@@ -12,7 +15,9 @@ import com.badlogic.gdx.math.Vector3
  * shape - 0 = inside a tube (ride the inner bottom),
  *         1 = flat ribbon cut open at the seam (you can fall off its edges),
  *         2 = outside of a tube (ride on top, the rest curves away below).
- *         Values in between blend linearly. Arc length is preserved in all three.
+ *         In between, the surface is a curve of constant curvature (1 - shape) / R through
+ *         the player's point, so the tube unrolls like a rolled sheet: the seam edges part
+ *         and meet again instead of sweeping across. Arc length is preserved for every shape.
  */
 object TunnelSurface {
     const val TAU = MathUtils.PI2
@@ -22,32 +27,25 @@ object TunnelSurface {
         (wrapAbs(u - seam) - wrapAbs(playerU - seam)) * TAU
 
     fun point(theta: Float, dist: Float, shape: Float, radius: Float, out: Vector3): Vector3 {
-        val s = MathUtils.sin(theta)
-        val c = MathUtils.cos(theta)
-        val flatX = radius * theta
-        val x: Float
-        val y: Float
-        if (shape <= 1f) {
-            x = MathUtils.lerp(radius * s, flatX, shape)
-            y = MathUtils.lerp(-radius * c, -radius, shape)
+        val a = (1f - shape) * theta
+        val arc = radius * theta
+        val sinc: Float
+        val cosc: Float
+        if (abs(a) < 1e-3f) {
+            // Series near the flat ribbon, where sin(a)/a and (1-cos a)/a are 0/0.
+            sinc = 1f - a * a / 6f
+            cosc = a * 0.5f
         } else {
-            val k = shape - 1f
-            x = MathUtils.lerp(flatX, radius * s, k)
-            y = MathUtils.lerp(-radius, -2f * radius + radius * c, k)
+            sinc = sin(a) / a
+            cosc = (1f - cos(a)) / a
         }
-        return out.set(x, y, -dist)
+        return out.set(arc * sinc, -radius + arc * cosc, -dist)
     }
 
     /** Unit vector along the surface in the +theta direction (in the XY plane). */
     fun tangent(theta: Float, shape: Float, out: Vector2): Vector2 {
-        val s = MathUtils.sin(theta)
-        val c = MathUtils.cos(theta)
-        return if (shape <= 1f) {
-            out.set(MathUtils.lerp(c, 1f, shape), MathUtils.lerp(s, 0f, shape)).nor()
-        } else {
-            val k = shape - 1f
-            out.set(MathUtils.lerp(1f, c, k), MathUtils.lerp(0f, -s, k)).nor()
-        }
+        val a = (1f - shape) * theta
+        return out.set(cos(a), sin(a))
     }
 
     /** Unit normal pointing from the surface towards the rider's side. */
